@@ -1,116 +1,43 @@
 import { useState, useEffect, useRef } from "react";
 
-const movies = [
-  {
-    id: 1,
-    title: "Blade Runner 2049",
-    year: 2017,
-    genre: ["Sci-Fi", "Thriller"],
-    rating: 8.0,
-    reviews: 842,
-    synopsis: "A young blade runner's discovery of a long-buried secret leads him to track down former blade runner Rick Deckard, who's been missing for thirty years.",
-    poster: "https://image.tmdb.org/t/p/w500/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg",
-    accent: "#C47D1A",
-    index: "001",
-  },
-  {
-    id: 2,
-    title: "The Dark Knight",
-    year: 2008,
-    genre: ["Action", "Crime"],
-    rating: 9.0,
-    reviews: 2700,
-    synopsis: "When the Joker wreaks havoc on Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.",
-    poster: "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=600&q=80",
-    accent: "#2E6FA3",
-    index: "002",
-  },
-  {
-    id: 3,
-    title: "Interstellar",
-    year: 2014,
-    genre: ["Sci-Fi", "Drama"],
-    rating: 8.6,
-    reviews: 1930,
-    synopsis: "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival as Earth faces catastrophic blight.",
-    poster: "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?w=600&q=80",
-    accent: "#8A7A3A",
-    index: "003",
-  },
-  {
-    id: 4,
-    title: "Parasite",
-    year: 2019,
-    genre: ["Drama", "Thriller"],
-    rating: 8.5,
-    reviews: 1560,
-    synopsis: "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.",
-    poster: "https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
-    accent: "#3A8A3A",
-    index: "004",
-  },
-  {
-    id: 5,
-    title: "Dune",
-    year: 2021,
-    genre: ["Sci-Fi", "Adventure"],
-    rating: 8.0,
-    reviews: 1100,
-    synopsis: "The son of a noble family entrusted with the protection of the most valuable asset in the galaxy must navigate treachery, politics, and destiny.",
-    poster: "https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg",
-    accent: "#B5671A",
-    index: "005",
-  },
-  {
-    id: 6,
-    title: "The Shawshank Redemption",
-    year: 1994,
-    genre: ["Drama"],
-    rating: 9.3,
-    reviews: 2900,
-    synopsis: "Two imprisoned men bond over years, finding solace and eventual redemption through acts of common decency in a harsh world.",
-    poster: "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
-    accent: "#9A5A30",
-    index: "006",
-  },
-  {
-    id: 7,
-    title: "Oppenheimer",
-    year: 2023,
-    genre: ["Biography", "Drama"],
-    rating: 8.9,
-    reviews: 1450,
-    synopsis: "The story of J. Robert Oppenheimer and his role in the development of the atomic bomb that forever changed the course of human history.",
-    poster: "https://image.tmdb.org/t/p/w500/ptpr0kGAckfQkJeJIt8st5dglvd.jpg",
-    accent: "#B83A10",
-    index: "007",
-  },
-  {
-    id: 8,
-    title: "Spirited Away",
-    year: 2001,
-    genre: ["Animation", "Fantasy"],
-    rating: 9.3,
-    reviews: 1750,
-    synopsis: "During her family's move to the suburbs, a sullen 10-year-old girl wanders into a world ruled by gods, witches, and spirits.",
-    poster: "https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg",
-    accent: "#A83060",
-    index: "008",
-  },
+const API_KEY = "1d0b000b8bbf7d95bdfa6bfd876956e5";
+const BASE_URL = "https://api.themoviedb.org/3";
+const IMG_BASE = "https://image.tmdb.org/t/p/w500";
+
+// TMDB genre ID → name map
+const GENRE_MAP = {
+  28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy",
+  80: "Crime", 99: "Documentary", 18: "Drama", 10751: "Family",
+  14: "Fantasy", 36: "History", 27: "Horror", 10402: "Music",
+  9648: "Mystery", 10749: "Romance", 878: "Sci-Fi", 10770: "TV Movie",
+  53: "Thriller", 10752: "War", 37: "Western", 28: "Action",
+};
+
+// Accent colors cycled per card
+const ACCENTS = [
+  "#C47D1A", "#2E6FA3", "#8A7A3A", "#3A8A3A",
+  "#B5671A", "#9A5A30", "#B83A10", "#A83060",
+  "#4A7A8A", "#7A3A8A", "#3A5A8A", "#8A3A4A",
 ];
 
-const allGenres = ["ALL", ...new Set(movies.flatMap((m) => m.genre))];
+function formatIndex(n) {
+  return String(n + 1).padStart(3, "0");
+}
 
 function useInView(ref) {
   const [inView, setInView] = useState(false);
   useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setInView(true); }, { threshold: 0.08 });
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) setInView(true); },
+      { threshold: 0.08 }
+    );
     if (ref.current) obs.observe(ref.current);
     return () => obs.disconnect();
   }, []);
   return inView;
 }
 
+// ─── MOVIE CARD ───────────────────────────────────────────────────────────────
 function MovieCard({ movie, rank, onClick }) {
   const ref = useRef();
   const inView = useInView(ref);
@@ -128,7 +55,7 @@ function MovieCard({ movie, rank, onClick }) {
         overflow: "hidden",
         background: "#ffffff",
         border: `1px solid ${hovered ? movie.accent + "55" : "#e8e2da"}`,
-        transition: `opacity 0.65s ${rank * 0.08}s, transform 0.65s ${rank * 0.08}s, border-color 0.3s, box-shadow 0.3s`,
+        transition: `opacity 0.65s ${rank * 0.06}s, transform 0.65s ${rank * 0.06}s, border-color 0.3s, box-shadow 0.3s`,
         opacity: inView ? 1 : 0,
         transform: inView
           ? (hovered ? "translateY(-6px)" : "translateY(0)")
@@ -141,8 +68,7 @@ function MovieCard({ movie, rank, onClick }) {
     >
       {/* Index stamp */}
       <div style={{
-        position: "absolute",
-        top: "10px", left: "12px",
+        position: "absolute", top: "10px", left: "12px",
         fontFamily: "'DM Mono', monospace",
         fontSize: "10px", letterSpacing: "2px",
         color: hovered ? movie.accent : "rgba(255,255,255,0.55)",
@@ -187,7 +113,6 @@ function MovieCard({ movie, rank, onClick }) {
           position: "absolute", inset: 0,
           background: "linear-gradient(to top, #ffffff 0%, rgba(255,255,255,0.1) 40%, transparent 70%)",
         }} />
-        {/* Accent sweep bar */}
         <div style={{
           position: "absolute", bottom: 0, left: 0,
           height: "3px", width: hovered ? "100%" : "0%",
@@ -252,7 +177,7 @@ function MovieCard({ movie, rank, onClick }) {
           transition: "border-color 0.3s",
         }}>
           <div style={{ display: "flex", gap: "3px" }}>
-            {[1,2,3,4,5].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <span key={i} style={{
                 fontSize: "11px",
                 color: i <= Math.round(movie.rating / 2) ? "#e6a817" : "#e0dbd4",
@@ -263,7 +188,9 @@ function MovieCard({ movie, rank, onClick }) {
             fontFamily: "'DM Mono', monospace",
             fontSize: "9px", color: "#ccc", letterSpacing: "1px",
           }}>
-            {(movie.reviews / 1000).toFixed(1)}K REVIEWS
+            {movie.reviews >= 1000
+              ? (movie.reviews / 1000).toFixed(1) + "K"
+              : movie.reviews} VOTES
           </span>
         </div>
       </div>
@@ -271,6 +198,7 @@ function MovieCard({ movie, rank, onClick }) {
   );
 }
 
+// ─── MODAL ────────────────────────────────────────────────────────────────────
 function Modal({ movie, onClose }) {
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -387,7 +315,7 @@ function Modal({ movie, onClose }) {
           </p>
 
           <div style={{ display: "flex", gap: "4px" }}>
-            {[1,2,3,4,5].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <span key={i} style={{
                 fontSize: "16px",
                 color: i <= Math.round(movie.rating / 2) ? "#e6a817" : "#e0dbd4",
@@ -412,7 +340,7 @@ function Modal({ movie, onClose }) {
                 fontFamily: "'DM Mono', monospace", fontSize: "9px",
                 color: "#bbb", letterSpacing: "2px", marginTop: "4px",
               }}>
-                USER SCORE / 10
+                TMDB SCORE / 10
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -427,7 +355,7 @@ function Modal({ movie, onClose }) {
                 fontFamily: "'DM Mono', monospace", fontSize: "9px",
                 color: "#bbb", letterSpacing: "2px",
               }}>
-                TOTAL REVIEWS
+                TOTAL VOTES
               </div>
             </div>
           </div>
@@ -437,9 +365,75 @@ function Modal({ movie, onClose }) {
   );
 }
 
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function MovieCatalog() {
+  const [movies, setMovies] = useState([]);
+  const [allGenres, setAllGenres] = useState(["ALL"]);
+  const [activeGenre, setActiveGenre] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [selected, setSelected] = useState(null);
-  const filtered = movies;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Fetch movies from TMDB
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    const isSearching = searchQuery.trim().length > 0;
+    const url = isSearching
+      ? `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(searchQuery)}&page=${page}`
+      : `${BASE_URL}/movie/popular?api_key=${API_KEY}&page=${page}`;
+
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch movies");
+        return r.json();
+      })
+      .then((data) => {
+        const mapped = data.results
+          .filter((m) => m.poster_path)
+          .map((m, i) => ({
+            id: m.id,
+            title: m.title,
+            year: m.release_date ? m.release_date.slice(0, 4) : "N/A",
+            genre: m.genre_ids.slice(0, 2).map((id) => GENRE_MAP[id] || "Other"),
+            rating: m.vote_average,
+            reviews: m.vote_count,
+            synopsis: m.overview || "No synopsis available.",
+            poster: IMG_BASE + m.poster_path,
+            accent: ACCENTS[i % ACCENTS.length],
+            index: formatIndex((page - 1) * 20 + i),
+          }));
+
+        setMovies(mapped);
+        setTotalPages(Math.min(data.total_pages, 10));
+
+        // Build genre list
+        const genres = ["ALL", ...new Set(mapped.flatMap((m) => m.genre))];
+        setAllGenres(genres);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [searchQuery, page]);
+
+  // Reset page when search changes
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    setActiveGenre("ALL");
+    setSearchQuery(searchInput);
+  };
+
+  const filtered = activeGenre === "ALL"
+    ? movies
+    : movies.filter((m) => m.genre.includes(activeGenre));
 
   return (
     <>
@@ -450,11 +444,10 @@ export default function MovieCatalog() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #ede8e0; }
         ::-webkit-scrollbar-thumb { background: #ccc; }
-
+        input:focus { outline: none; }
       `}</style>
 
       <div style={{ minHeight: "100vh", background: "#f5f0e8" }}>
-
 
         {/* MASTHEAD */}
         <div style={{
@@ -492,61 +485,220 @@ export default function MovieCatalog() {
                   fontFamily: "'Cormorant Garamond', serif",
                   fontStyle: "italic", fontSize: "15px", color: "#b0a898",
                 }}>
-                  
+                  Powered by TMDB
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Search bar */}
+          <form onSubmit={handleSearch} style={{ display: "flex", alignItems: "center", gap: "0", paddingBottom: "6px" }}>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search films..."
+              style={{
+                background: "#fff",
+                border: "1px solid #ddd6ca",
+                borderRight: "none",
+                borderRadius: "3px 0 0 3px",
+                padding: "10px 16px",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px",
+                letterSpacing: "1px",
+                color: "#1a1610",
+                width: "220px",
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                background: "#1a1610",
+                border: "1px solid #1a1610",
+                borderRadius: "0 3px 3px 0",
+                padding: "10px 16px",
+                cursor: "pointer",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px",
+                letterSpacing: "2px",
+                color: "#f5f0e8",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => (e.target.style.background = "#2e2820")}
+              onMouseLeave={(e) => (e.target.style.background = "#1a1610")}
+            >
+              SEARCH
+            </button>
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  fontFamily: "'DM Mono', monospace", fontSize: "9px",
+                  letterSpacing: "2px", color: "#bbb", marginLeft: "12px",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => (e.target.style.color = "#B83A10")}
+                onMouseLeave={(e) => (e.target.style.color = "#bbb")}
+              >
+                ✕ CLEAR
+              </button>
+            )}
+          </form>
         </div>
 
-        {/* FILTER (Static) */}
+        {/* FILTER BAR */}
         <div style={{
           padding: "14px 56px",
           display: "flex",
           borderBottom: "1px solid #e0d9ce",
           alignItems: "center",
           background: "#f0ebe2",
+          flexWrap: "wrap",
+          gap: "4px",
         }}>
           <span style={{
             fontFamily: "'DM Mono', monospace",
-            fontSize: "9px",
-            letterSpacing: "3px",
-            color: "#c0b8a8",
-            textTransform: "uppercase",
-            marginRight: "20px",
+            fontSize: "9px", letterSpacing: "3px",
+            color: "#c0b8a8", textTransform: "uppercase",
+            marginRight: "16px",
           }}>
             FILTER
           </span>
-
           {allGenres.map((g) => (
-            <span
+            <button
               key={g}
+              onClick={() => setActiveGenre(g)}
               style={{
+                background: "none",
+                border: activeGenre === g ? "1px solid #9A5A30" : "1px solid transparent",
+                borderRadius: "3px",
+                cursor: "pointer",
                 fontFamily: "'DM Mono', monospace",
-                fontSize: "10px",
-                letterSpacing: "2px",
+                fontSize: "10px", letterSpacing: "2px",
                 textTransform: "uppercase",
-                color: "#b0a898",
-                padding: "8px 14px",
+                color: activeGenre === g ? "#9A5A30" : "#b0a898",
+                padding: "6px 12px",
+                transition: "color 0.2s, border-color 0.2s",
               }}
             >
               {g}
-            </span>
+            </button>
           ))}
         </div>
 
-        {/* CARD GRID */}
-        <div style={{
-          padding: "40px 56px 60px",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))",
-          gap: "24px",
-        }}>
-          {filtered.map((movie, i) => (
-            <MovieCard key={movie.id} movie={movie} rank={i} onClick={setSelected} />
-          ))}
-        </div>
+        {/* CONTENT */}
+        {loading ? (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            height: "400px", flexDirection: "column", gap: "16px",
+          }}>
+            <div style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontSize: "28px", fontStyle: "italic", color: "#c0b8a8",
+            }}>
+              Loading films...
+            </div>
+            <div style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px", letterSpacing: "3px", color: "#d0c8bc",
+            }}>
+              FETCHING FROM TMDB
+            </div>
+          </div>
+        ) : error ? (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            height: "400px",
+          }}>
+            <div style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "11px", letterSpacing: "1px", color: "#B83A10",
+            }}>
+              ✕ {error}
+            </div>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            height: "400px", flexDirection: "column", gap: "12px",
+          }}>
+            <div style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontSize: "24px", fontStyle: "italic", color: "#c0b8a8",
+            }}>
+              No films found.
+            </div>
+            <div style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px", letterSpacing: "2px", color: "#d0c8bc",
+            }}>
+              TRY A DIFFERENT SEARCH OR FILTER
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            padding: "40px 56px 60px",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))",
+            gap: "24px",
+          }}>
+            {filtered.map((movie, i) => (
+              <MovieCard key={movie.id} movie={movie} rank={i} onClick={setSelected} />
+            ))}
+          </div>
+        )}
+
+        {/* PAGINATION */}
+        {!loading && !error && filtered.length > 0 && (
+          <div style={{
+            display: "flex", justifyContent: "center", alignItems: "center",
+            gap: "8px", padding: "0 56px 48px",
+          }}>
+            <button
+              onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={page === 1}
+              style={{
+                background: "none",
+                border: "1px solid #ddd6ca",
+                borderRadius: "3px",
+                padding: "8px 16px",
+                cursor: page === 1 ? "not-allowed" : "pointer",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px", letterSpacing: "2px",
+                color: page === 1 ? "#d0c8bc" : "#9A5A30",
+                transition: "border-color 0.2s",
+              }}
+            >
+              ← PREV
+            </button>
+            <span style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px", letterSpacing: "2px", color: "#b0a898",
+              padding: "0 12px",
+            }}>
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={page === totalPages}
+              style={{
+                background: "none",
+                border: "1px solid #ddd6ca",
+                borderRadius: "3px",
+                padding: "8px 16px",
+                cursor: page === totalPages ? "not-allowed" : "pointer",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px", letterSpacing: "2px",
+                color: page === totalPages ? "#d0c8bc" : "#9A5A30",
+                transition: "border-color 0.2s",
+              }}
+            >
+              NEXT →
+            </button>
+          </div>
+        )}
 
         {/* FOOTER */}
         <div style={{
@@ -555,7 +707,7 @@ export default function MovieCatalog() {
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "3px", color: "#c0b8a8" }}>
-            REEL · FILM CATALOG · ALL RIGHTS RESERVED
+            REEL · FILM CATALOG · POWERED BY TMDB
           </div>
           <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: "13px", color: "#c0b8a8" }}>
             Click any card to expand
