@@ -1,7 +1,6 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { useInView } from "../hooks/useInView";
 
-// ─── MOVIE CARD ───────────────────────────────────────────────────────────────
 export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminDelete }) {
   const ref = useRef();
   const inView = useInView(ref);
@@ -64,8 +63,7 @@ export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminD
       {/* Poster */}
       <div style={{ position: "relative", height: "256px", overflow: "hidden" }}>
         <img
-          src={movie.poster}
-          alt={movie.title}
+          src={movie.poster} alt={movie.title}
           style={{
             width: "100%", height: "100%", objectFit: "cover", display: "block",
             transition: "transform 0.6s cubic-bezier(0.4,0,0.2,1)",
@@ -158,7 +156,7 @@ export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminD
           </span>
         </div>
 
-        {/* Admin controls — only visible to admins */}
+        {/* Admin controls — edit on all cards, delete only on Supabase cards */}
         {isAdmin && (
           <div
             onClick={(e) => e.stopPropagation()}
@@ -170,55 +168,37 @@ export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminD
             }}
           >
             <button
-              onClick={() => onAdminEdit(movie)}
+              onClick={() => onAdminEdit({ ...movie, tmdbId: movie.fromSupabase ? movie.tmdbId : movie.id })}
               style={{
-                flex: 1,
-                background: "none",
-                border: "1px solid #2E6FA3",
-                borderRadius: "3px",
-                padding: "6px 0",
-                cursor: "pointer",
+                flex: 1, background: "none",
+                border: "1px solid #2E6FA3", borderRadius: "3px",
+                padding: "6px 0", cursor: "pointer",
                 fontFamily: "'DM Mono', monospace",
-                fontSize: "9px", letterSpacing: "1.5px",
-                color: "#2E6FA3",
+                fontSize: "9px", letterSpacing: "1.5px", color: "#2E6FA3",
                 transition: "background 0.2s, color 0.2s",
               }}
-              onMouseEnter={(e) => {
-                e.target.style.background = "#2E6FA3";
-                e.target.style.color = "#fff";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = "none";
-                e.target.style.color = "#2E6FA3";
-              }}
+              onMouseEnter={(e) => { e.target.style.background = "#2E6FA3"; e.target.style.color = "#fff"; }}
+              onMouseLeave={(e) => { e.target.style.background = "none"; e.target.style.color = "#2E6FA3"; }}
             >
               EDIT
             </button>
-            <button
-              onClick={() => onAdminDelete(movie)}
-              style={{
-                flex: 1,
-                background: "none",
-                border: "1px solid #B83A10",
-                borderRadius: "3px",
-                padding: "6px 0",
-                cursor: "pointer",
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "9px", letterSpacing: "1.5px",
-                color: "#B83A10",
-                transition: "background 0.2s, color 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = "#B83A10";
-                e.target.style.color = "#fff";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = "none";
-                e.target.style.color = "#B83A10";
-              }}
-            >
-              DELETE
-            </button>
+            {movie.fromSupabase && (
+              <button
+                onClick={() => onAdminDelete(movie)}
+                style={{
+                  flex: 1, background: "none",
+                  border: "1px solid #B83A10", borderRadius: "3px",
+                  padding: "6px 0", cursor: "pointer",
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "9px", letterSpacing: "1.5px", color: "#B83A10",
+                  transition: "background 0.2s, color 0.2s",
+                }}
+                onMouseEnter={(e) => { e.target.style.background = "#B83A10"; e.target.style.color = "#fff"; }}
+                onMouseLeave={(e) => { e.target.style.background = "none"; e.target.style.color = "#B83A10"; }}
+              >
+                DELETE
+              </button>
+            )}
           </div>
         )}
       </div>

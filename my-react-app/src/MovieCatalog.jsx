@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
 import { API_KEY, BASE_URL, IMG_BASE, GENRE_MAP, ACCENTS, formatIndex } from "./lib/constants";
-import { AuthModal } from "./components/AuthModal";
 import { MovieCard } from "./components/MovieCard";
 import { Modal } from "./components/Modal";
+import { AuthModal } from "./components/AuthModal";
 import { AdminMovieModal } from "./components/AdminMovieModal";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function MovieCatalog() {
-  // ── Movie state (from teammates) ──
-  const [movies, setMovies] = useState([]);
+  // ── Movie state ──
+  const [movies, setMovies] = useState([]);           // from TMDB
+  const [supabaseMovies, setSupabaseMovies] = useState([]); // admin-added from Supabase
   const [allGenres, setAllGenres] = useState(["ALL"]);
   const [activeGenre, setActiveGenre] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,28 +21,24 @@ export default function MovieCatalog() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // ── Auth state (Elias — Authentication & Role Logic) ──
-  const [currentUser, setCurrentUser] = useState(null);   // Supabase user object + profile
-  const [isAdmin, setIsAdmin] = useState(false);           // true if role === 'admin'
-  const [authChecked, setAuthChecked] = useState(false);   // prevents flash before session loads
+  // ── Auth state ──
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // ── Admin action state ──
   const [showAddMovie, setShowAddMovie] = useState(false);
-  const [editMovie, setEditMovie] = useState(null);        // movie being edited
-  const [deleteMovie, setDeleteMovie] = useState(null);    // movie pending deletion
+  const [editMovie, setEditMovie] = useState(null);
+  const [deleteMovie, setDeleteMovie] = useState(null);
 
-  // ── On mount: restore session if user was previously logged in ──
+  // ── Restore session on mount ──
   useEffect(() => {
-    // Check if there's an active Supabase session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        await loadUserProfile(session.user);
-      }
+      if (session?.user) await loadUserProfile(session.user);
       setAuthChecked(true);
     });
 
-    // Listen for auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === "SIGNED_OUT" || !session) {
@@ -55,7 +51,6 @@ export default function MovieCatalog() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Fetch profile row to determine role ──
   const loadUserProfile = async (user) => {
     const { data: profile } = await supabase
       .from("profiles")
@@ -69,21 +64,53 @@ export default function MovieCatalog() {
     }
   };
 
-  // ── Called by AuthModal on successful login/register ──
   const handleAuthSuccess = (user, adminStatus) => {
     setCurrentUser(user);
     setIsAdmin(adminStatus);
     setShowAuthModal(false);
   };
 
-  // ── Logout ──
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
     setIsAdmin(false);
   };
 
-  // ── Fetch movies from TMDB (unchanged from teammates) ──
+  // ── Fetch admin-added movies from Supabase ──
+  const fetchSupabaseMovies = async () => {
+    const { data, error } = await supabase
+      .from("movies")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      const mapped = data.map((m, i) => ({
+        id: `sb-${m.id}`,
+        supabaseId: m.id,
+        tmdbId: m.tmdb_id || null,
+        title: m.title,
+        year: m.year || "N/A",
+        genre: Array.isArray(m.genre) ? m.genre : [],
+        rating: 0,
+        reviews: 0,
+        synopsis: m.synopsis || "No synopsis available.",
+        poster: m.poster_url || "https://via.placeholder.com/500x750?text=No+Poster",
+        accent: ACCENTS[i % ACCENTS.length],
+        index: formatIndex(i),
+        fromSupabase: true,
+      }));
+      // Always fully replace — never append
+      setSupabaseMovies(mapped);
+    } else {
+      setSupabaseMovies([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchSupabaseMovies();
+  }, []);
+
+  // ── Fetch movies from TMDB ──
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -117,7 +144,10 @@ export default function MovieCatalog() {
         setMovies(mapped);
         setTotalPages(Math.min(data.total_pages, 10));
 
-        const genres = ["ALL", ...new Set(mapped.flatMap((m) => m.genre))];
+        const genres = ["ALL", ...new Set([
+          ...mapped.flatMap((m) => m.genre),
+          ...supabaseMovies.flatMap((m) => m.genre),
+        ])];
         setAllGenres(genres);
         setLoading(false);
       })
@@ -127,7 +157,6 @@ export default function MovieCatalog() {
       });
   }, [searchQuery, page]);
 
-  // Reset page when search changes
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
@@ -135,26 +164,33 @@ export default function MovieCatalog() {
     setSearchQuery(searchInput);
   };
 
-  // ── Admin: handle movie deleted — remove from local state immediately ──
   const handleMovieDeleted = (deletedMovie) => {
-    setMovies((prev) => prev.filter((m) => m.id !== deletedMovie.id));
+    setSupabaseMovies((prev) => prev.filter((m) => m.supabaseId !== deletedMovie.supabaseId));
     setDeleteMovie(null);
   };
 
-  // ── Admin: handle movie saved (added or edited) — refresh list ──
   const handleMovieSaved = () => {
     setShowAddMovie(false);
     setEditMovie(null);
-    // Re-trigger fetch by briefly toggling page
-    setLoading(true);
-    setPage((p) => p); // triggers useEffect re-run
+    setSupabaseMovies([]); // clear first to prevent duplicate flash
+    fetchSupabaseMovies();
   };
 
-  const filtered = activeGenre === "ALL"
-    ? movies
-    : movies.filter((m) => m.genre.includes(activeGenre));
+  // Merge Supabase admin movies (top) + TMDB movies (below)
+  // If a Supabase movie has a tmdb_id, hide the original TMDB card so it doesn't show twice
+  const overriddenTmdbIds = new Set(
+    supabaseMovies.map((m) => m.tmdbId).filter(Boolean)
+  );
 
-  // Don't render until we've checked for an existing session
+  const allMovies = [
+    ...supabaseMovies,
+    ...movies.filter((m) => !overriddenTmdbIds.has(m.id)),
+  ];
+
+  const filtered = activeGenre === "ALL"
+    ? allMovies
+    : allMovies.filter((m) => m.genre.includes(activeGenre));
+
   if (!authChecked) return null;
 
   return (
@@ -188,8 +224,7 @@ export default function MovieCatalog() {
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: "22px" }}>
               <h1 style={{
-                margin: 0,
-                fontFamily: "'Cormorant Garamond', serif",
+                margin: 0, fontFamily: "'Cormorant Garamond', serif",
                 fontWeight: "700", fontSize: "72px",
                 letterSpacing: "-4px", lineHeight: 0.9, color: "#1a1610",
               }}>
@@ -214,14 +249,13 @@ export default function MovieCatalog() {
             </div>
           </div>
 
-          {/* Right side: Search + Auth controls */}
+          {/* Auth + Search */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "12px", paddingBottom: "6px" }}>
 
-            {/* ── AUTH NAV AREA ── */}
+            {/* Auth nav */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               {currentUser ? (
                 <>
-                  {/* Logged-in user info */}
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     {isAdmin && (
                       <span style={{
@@ -241,7 +275,6 @@ export default function MovieCatalog() {
                     </span>
                   </div>
 
-                  {/* Admin: Add Movie button */}
                   {isAdmin && (
                     <button
                       onClick={() => setShowAddMovie(true)}
@@ -259,31 +292,22 @@ export default function MovieCatalog() {
                     </button>
                   )}
 
-                  {/* Logout button */}
                   <button
                     onClick={handleLogout}
                     style={{
-                      background: "none",
-                      border: "1px solid #e0d9ce",
+                      background: "none", border: "1px solid #e0d9ce",
                       borderRadius: "3px", padding: "8px 14px",
                       cursor: "pointer", fontFamily: "'DM Mono', monospace",
                       fontSize: "9px", letterSpacing: "2px", color: "#b0a898",
                       transition: "border-color 0.2s, color 0.2s",
                     }}
-                    onMouseEnter={(e) => {
-                      e.target.style.borderColor = "#B83A10";
-                      e.target.style.color = "#B83A10";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.borderColor = "#e0d9ce";
-                      e.target.style.color = "#b0a898";
-                    }}
+                    onMouseEnter={(e) => { e.target.style.borderColor = "#B83A10"; e.target.style.color = "#B83A10"; }}
+                    onMouseLeave={(e) => { e.target.style.borderColor = "#e0d9ce"; e.target.style.color = "#b0a898"; }}
                   >
                     SIGN OUT
                   </button>
                 </>
               ) : (
-                /* Not logged in — show Sign In button */
                 <button
                   onClick={() => setShowAuthModal(true)}
                   style={{
@@ -301,38 +325,26 @@ export default function MovieCatalog() {
               )}
             </div>
 
-            {/* Search bar (unchanged from teammates) */}
-            <form onSubmit={handleSearch} style={{ display: "flex", alignItems: "center", gap: "0" }}>
+            {/* Search bar */}
+            <form onSubmit={handleSearch} style={{ display: "flex", alignItems: "center" }}>
               <input
-                type="text"
-                value={searchInput}
+                type="text" value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search films..."
                 style={{
-                  background: "#fff",
-                  border: "1px solid #ddd6ca",
-                  borderRight: "none",
-                  borderRadius: "3px 0 0 3px",
-                  padding: "10px 16px",
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "10px",
-                  letterSpacing: "1px",
-                  color: "#1a1610",
-                  width: "220px",
+                  background: "#fff", border: "1px solid #ddd6ca",
+                  borderRight: "none", borderRadius: "3px 0 0 3px",
+                  padding: "10px 16px", fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px", letterSpacing: "1px", color: "#1a1610", width: "220px",
                 }}
               />
               <button
                 type="submit"
                 style={{
-                  background: "#1a1610",
-                  border: "1px solid #1a1610",
-                  borderRadius: "0 3px 3px 0",
-                  padding: "10px 16px",
-                  cursor: "pointer",
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "9px",
-                  letterSpacing: "2px",
-                  color: "#f5f0e8",
+                  background: "#1a1610", border: "1px solid #1a1610",
+                  borderRadius: "0 3px 3px 0", padding: "10px 16px",
+                  cursor: "pointer", fontFamily: "'DM Mono', monospace",
+                  fontSize: "9px", letterSpacing: "2px", color: "#f5f0e8",
                   transition: "background 0.2s",
                 }}
                 onMouseEnter={(e) => (e.target.style.background = "#2e2820")}
@@ -345,8 +357,8 @@ export default function MovieCatalog() {
                   onClick={() => { setSearchInput(""); setSearchQuery(""); setPage(1); }}
                   style={{
                     background: "none", border: "none", cursor: "pointer",
-                    fontFamily: "'DM Mono', monospace", fontSize: "9px",
-                    letterSpacing: "2px", color: "#bbb", marginLeft: "12px",
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "9px", letterSpacing: "2px", color: "#bbb", marginLeft: "12px",
                     transition: "color 0.2s",
                   }}
                   onMouseEnter={(e) => (e.target.style.color = "#B83A10")}
@@ -359,21 +371,16 @@ export default function MovieCatalog() {
           </div>
         </div>
 
-        {/* ── FILTER BAR (unchanged from teammates) ── */}
+        {/* ── FILTER BAR ── */}
         <div style={{
-          padding: "14px 56px",
-          display: "flex",
-          borderBottom: "1px solid #e0d9ce",
-          alignItems: "center",
-          background: "#f0ebe2",
-          flexWrap: "wrap",
-          gap: "4px",
+          padding: "14px 56px", display: "flex",
+          borderBottom: "1px solid #e0d9ce", alignItems: "center",
+          background: "#f0ebe2", flexWrap: "wrap", gap: "4px",
         }}>
           <span style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: "9px", letterSpacing: "3px",
-            color: "#c0b8a8", textTransform: "uppercase",
-            marginRight: "16px",
+            fontFamily: "'DM Mono', monospace", fontSize: "9px",
+            letterSpacing: "3px", color: "#c0b8a8",
+            textTransform: "uppercase", marginRight: "16px",
           }}>
             FILTER
           </span>
@@ -384,14 +391,12 @@ export default function MovieCatalog() {
               style={{
                 background: "none",
                 border: activeGenre === g ? "1px solid #9A5A30" : "1px solid transparent",
-                borderRadius: "3px",
-                cursor: "pointer",
+                borderRadius: "3px", cursor: "pointer",
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "10px", letterSpacing: "2px",
                 textTransform: "uppercase",
                 color: activeGenre === g ? "#9A5A30" : "#b0a898",
-                padding: "6px 12px",
-                transition: "color 0.2s, border-color 0.2s",
+                padding: "6px 12px", transition: "color 0.2s, border-color 0.2s",
               }}
             >
               {g}
@@ -399,7 +404,7 @@ export default function MovieCatalog() {
           ))}
         </div>
 
-        {/* ── CONTENT (unchanged from teammates, admin props added) ── */}
+        {/* ── CONTENT ── */}
         {loading ? (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -420,8 +425,7 @@ export default function MovieCatalog() {
           </div>
         ) : error ? (
           <div style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            height: "400px",
+            display: "flex", alignItems: "center", justifyContent: "center", height: "400px",
           }}>
             <div style={{
               fontFamily: "'DM Mono', monospace",
@@ -469,7 +473,7 @@ export default function MovieCatalog() {
           </div>
         )}
 
-        {/* ── PAGINATION (unchanged from teammates) ── */}
+        {/* ── PAGINATION ── */}
         {!loading && !error && filtered.length > 0 && (
           <div style={{
             display: "flex", justifyContent: "center", alignItems: "center",
@@ -479,10 +483,8 @@ export default function MovieCatalog() {
               onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
               disabled={page === 1}
               style={{
-                background: "none",
-                border: "1px solid #ddd6ca",
-                borderRadius: "3px",
-                padding: "8px 16px",
+                background: "none", border: "1px solid #ddd6ca",
+                borderRadius: "3px", padding: "8px 16px",
                 cursor: page === 1 ? "not-allowed" : "pointer",
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "9px", letterSpacing: "2px",
@@ -494,8 +496,7 @@ export default function MovieCatalog() {
             </button>
             <span style={{
               fontFamily: "'DM Mono', monospace",
-              fontSize: "9px", letterSpacing: "2px", color: "#b0a898",
-              padding: "0 12px",
+              fontSize: "9px", letterSpacing: "2px", color: "#b0a898", padding: "0 12px",
             }}>
               {page} / {totalPages}
             </span>
@@ -503,10 +504,8 @@ export default function MovieCatalog() {
               onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
               disabled={page === totalPages}
               style={{
-                background: "none",
-                border: "1px solid #ddd6ca",
-                borderRadius: "3px",
-                padding: "8px 16px",
+                background: "none", border: "1px solid #ddd6ca",
+                borderRadius: "3px", padding: "8px 16px",
                 cursor: page === totalPages ? "not-allowed" : "pointer",
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "9px", letterSpacing: "2px",
@@ -519,48 +518,46 @@ export default function MovieCatalog() {
           </div>
         )}
 
-        {/* ── FOOTER (unchanged from teammates) ── */}
+        {/* ── FOOTER ── */}
         <div style={{
           padding: "32px 56px", borderTop: "1px solid #e0d9ce",
           background: "#eee8de",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "3px", color: "#c0b8a8" }}>
+          <div style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "9px", letterSpacing: "3px", color: "#c0b8a8",
+          }}>
             REEL · FILM CATALOG · POWERED BY TMDB
           </div>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: "13px", color: "#c0b8a8" }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', serif",
+            fontStyle: "italic", fontSize: "13px", color: "#c0b8a8",
+          }}>
             Click any card to expand
           </div>
         </div>
       </div>
 
       {/* ── MODALS ── */}
-
-      {/* Movie detail modal (updated with admin props) */}
       <Modal
         movie={selected}
         onClose={() => setSelected(null)}
         isAdmin={isAdmin}
         onAdminEdit={setEditMovie}
       />
-
-      {/* Auth modal — login / register */}
       {showAuthModal && (
         <AuthModal
           onClose={() => setShowAuthModal(false)}
           onSuccess={handleAuthSuccess}
         />
       )}
-
-      {/* Admin: Add movie modal */}
       {showAddMovie && (
         <AdminMovieModal
           onClose={() => setShowAddMovie(false)}
           onSave={handleMovieSaved}
         />
       )}
-
-      {/* Admin: Edit movie modal */}
       {editMovie && (
         <AdminMovieModal
           editMovie={editMovie}
@@ -568,8 +565,6 @@ export default function MovieCatalog() {
           onSave={handleMovieSaved}
         />
       )}
-
-      {/* Admin: Delete confirm modal */}
       {deleteMovie && (
         <DeleteConfirmModal
           movie={deleteMovie}
