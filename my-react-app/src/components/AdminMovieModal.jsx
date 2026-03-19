@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+// ─── ADMIN MOVIE FORM MODAL ───────────────────────────────────────────────────
+// Used for both Add Movie and Edit Movie (admin only).
+// When `editMovie` is provided, it pre-fills the form for editing.
+// On save, calls onSave(formData). On cancel, calls onClose().
+//
+// NOTE: This saves to your Supabase `movies` table.
+// Assumes columns: title, year, genre (text[]), synopsis, poster_url, tmdb_rating
 export function AdminMovieModal({ editMovie, onClose, onSave }) {
   const [loaded, setLoaded] = useState(false);
   const [title, setTitle] = useState(editMovie?.title || "");
@@ -11,7 +18,9 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => { setTimeout(() => setLoaded(true), 10); }, []);
+  useEffect(() => {
+    setTimeout(() => setLoaded(true), 10);
+  }, []);
 
   const handleSave = async () => {
     setError(null);
@@ -29,12 +38,14 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
       };
 
       if (editMovie?.supabaseId) {
+        // UPDATE existing movie in Supabase
         const { error: updateError } = await supabase
           .from("movies")
           .update(formData)
           .eq("id", editMovie.supabaseId);
         if (updateError) throw updateError;
       } else {
+        // INSERT new movie into Supabase
         const { error: insertError } = await supabase
           .from("movies")
           .insert([formData]);
@@ -89,6 +100,7 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
           position: "relative",
         }}
       >
+        {/* Header */}
         <div style={{ marginBottom: "28px" }}>
           <div style={{
             fontFamily: "'DM Mono', monospace", fontSize: "9px",
@@ -167,8 +179,8 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
               flex: 1, background: loading ? "#c0b8a8" : "#1a1610",
               border: "none", borderRadius: "3px", padding: "12px",
               cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "10px", letterSpacing: "2px", color: "#f5f0e8",
+              fontFamily: "'DM Mono', monospace", fontSize: "10px",
+              letterSpacing: "2px", color: "#f5f0e8",
               transition: "background 0.2s",
             }}
             onMouseEnter={(e) => { if (!loading) e.target.style.background = "#2e2820"; }}

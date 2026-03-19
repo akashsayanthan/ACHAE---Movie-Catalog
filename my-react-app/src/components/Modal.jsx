@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 
+// ─── MODAL (Movie Detail) ─────────────────────────────────────────────────────
 export function Modal({ movie, onClose, isAdmin, onAdminEdit }) {
   const [loaded, setLoaded] = useState(false);
-
   useEffect(() => {
     if (movie) setTimeout(() => setLoaded(true), 10);
     else setLoaded(false);
   }, [movie]);
-
   if (!movie) return null;
 
   return (
@@ -60,7 +59,7 @@ export function Modal({ movie, onClose, isAdmin, onAdminEdit }) {
           </div>
         </div>
 
-        {/* Info panel */}
+        {/* Info */}
         <div style={{
           flex: 1, background: "#faf7f2",
           padding: "36px 40px",
@@ -68,14 +67,19 @@ export function Modal({ movie, onClose, isAdmin, onAdminEdit }) {
           overflowY: "auto",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {/* Admin edit button inside modal */}
             {isAdmin && (
               <button
                 onClick={() => { onClose(); onAdminEdit(movie); }}
                 style={{
-                  background: "none", border: "1px solid #2E6FA3",
-                  borderRadius: "3px", padding: "6px 14px", cursor: "pointer",
+                  background: "none",
+                  border: "1px solid #2E6FA3",
+                  borderRadius: "3px",
+                  padding: "6px 14px",
+                  cursor: "pointer",
                   fontFamily: "'DM Mono', monospace",
-                  fontSize: "9px", letterSpacing: "2px", color: "#2E6FA3",
+                  fontSize: "9px", letterSpacing: "2px",
+                  color: "#2E6FA3",
                   transition: "background 0.2s, color 0.2s",
                 }}
                 onMouseEnter={(e) => { e.target.style.background = "#2E6FA3"; e.target.style.color = "#fff"; }}
@@ -90,7 +94,8 @@ export function Modal({ movie, onClose, isAdmin, onAdminEdit }) {
                 background: "none", border: "none", cursor: "pointer",
                 fontFamily: "'DM Mono', monospace", fontSize: "10px",
                 letterSpacing: "2px", color: "#bbb", padding: "0",
-                marginLeft: "auto", transition: "color 0.2s",
+                marginLeft: "auto",
+                transition: "color 0.2s",
               }}
               onMouseEnter={(e) => (e.target.style.color = movie.accent)}
               onMouseLeave={(e) => (e.target.style.color = "#bbb")}
@@ -114,7 +119,8 @@ export function Modal({ movie, onClose, isAdmin, onAdminEdit }) {
           </div>
 
           <h2 style={{
-            margin: 0, fontFamily: "'Cormorant Garamond', serif",
+            margin: 0,
+            fontFamily: "'Cormorant Garamond', serif",
             fontSize: "40px", fontWeight: "700",
             color: "#111", lineHeight: 1.05, letterSpacing: "-1px",
           }}>
@@ -124,8 +130,10 @@ export function Modal({ movie, onClose, isAdmin, onAdminEdit }) {
           <div style={{ height: "1px", background: `linear-gradient(to right, ${movie.accent}, transparent)` }} />
 
           <p style={{
-            margin: 0, fontFamily: "'Cormorant Garamond', serif",
-            fontStyle: "italic", fontSize: "16px", color: "#777", lineHeight: "1.75",
+            margin: 0,
+            fontFamily: "'Cormorant Garamond', serif",
+            fontStyle: "italic", fontSize: "16px",
+            color: "#777", lineHeight: "1.75",
           }}>
             {movie.synopsis}
           </p>
@@ -162,7 +170,8 @@ export function Modal({ movie, onClose, isAdmin, onAdminEdit }) {
             <div style={{ textAlign: "right" }}>
               <div style={{
                 fontFamily: "'Cormorant Garamond', serif",
-                fontSize: "24px", fontWeight: "700", color: "#ccc", letterSpacing: "-0.5px",
+                fontSize: "24px", fontWeight: "700",
+                color: "#ccc", letterSpacing: "-0.5px",
               }}>
                 {movie.reviews.toLocaleString()}
               </div>

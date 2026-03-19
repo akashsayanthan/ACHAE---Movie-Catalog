@@ -1,17 +1,23 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+// ─── DELETE CONFIRM MODAL ─────────────────────────────────────────────────────
+// Admin only. Confirms before deleting a movie from Supabase.
 export function DeleteConfirmModal({ movie, onClose, onConfirm }) {
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => { setTimeout(() => setLoaded(true), 10); }, []);
+  useEffect(() => {
+    setTimeout(() => setLoaded(true), 10);
+  }, []);
 
   const handleDelete = async () => {
     setLoading(true);
     setError(null);
     try {
+      // Delete from Supabase `movies` table by supabaseId
+      // If movie came from TMDB (no supabaseId), we store its tmdb id as reference
       const { error: deleteError } = await supabase
         .from("movies")
         .delete()
@@ -66,7 +72,8 @@ export function DeleteConfirmModal({ movie, onClose, onConfirm }) {
         <p style={{
           margin: "0 0 24px",
           fontFamily: "'Cormorant Garamond', serif",
-          fontStyle: "italic", fontSize: "15px", color: "#999", lineHeight: "1.6",
+          fontStyle: "italic", fontSize: "15px", color: "#999",
+          lineHeight: "1.6",
         }}>
           This will permanently delete this film from the catalog. This action cannot be undone.
         </p>
@@ -89,8 +96,8 @@ export function DeleteConfirmModal({ movie, onClose, onConfirm }) {
               flex: 1, background: loading ? "#e0b0a8" : "#B83A10",
               border: "none", borderRadius: "3px", padding: "12px",
               cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "10px", letterSpacing: "2px", color: "#fff",
+              fontFamily: "'DM Mono', monospace", fontSize: "10px",
+              letterSpacing: "2px", color: "#fff",
               transition: "background 0.2s",
             }}
             onMouseEnter={(e) => { if (!loading) e.target.style.background = "#8A2A08"; }}

@@ -1,14 +1,14 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { AuthModal } from "../../my-react-app/src/components/AuthModal";
+import { AuthModal } from "../components/AuthModal";
 
 //mock supabase
-const mockSignIn = jest.fn();
-const mockSignUp = jest.fn();
-const mockInsertProfile = jest.fn();
-const mockSelectProfile = jest.fn();
+const mockSignIn = vi.fn();
+const mockSignUp = vi.fn();
+const mockInsertProfile = vi.fn();
+const mockSelectProfile = vi.fn();
 
-jest.mock("../lib/supabaseClient", () => ({
+vi.mock("../lib/supabaseClient", () => ({
   supabase: {
     auth: {
       signInWithPassword: (...args) => mockSignIn(...args),
@@ -26,7 +26,6 @@ jest.mock("../lib/supabaseClient", () => ({
 }));
 
 //helpers
-
 const noop = () => {};
 
 function renderAuthModal(props = {}) {
@@ -37,11 +36,10 @@ function renderAuthModal(props = {}) {
 describe("AuthModal", () => {
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // Rendering
-
   describe("rendering", () => {
     test("renders in login mode by default", () => {
       renderAuthModal();
@@ -60,7 +58,6 @@ describe("AuthModal", () => {
   });
 
   //switchMode
-
   describe("switchMode", () => {
     test("clears form fields when switching to register", () => {
       renderAuthModal();
@@ -80,7 +77,6 @@ describe("AuthModal", () => {
   });
 
   //handleLogin
-
   describe("handleLogin", () => {
     test("calls signInWithPassword with the entered email and password", async () => {
       mockSignIn.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
@@ -104,7 +100,7 @@ describe("AuthModal", () => {
     });
 
     test("calls onSuccess with user and isAdmin=false for a regular user", async () => {
-      const onSuccess = jest.fn();
+      const onSuccess = vi.fn();
       mockSignIn.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
       mockSelectProfile.mockResolvedValueOnce({ data: { username: "tester", role: "user" }, error: null });
 
@@ -146,8 +142,7 @@ describe("AuthModal", () => {
     });
   });
 
-  // handleRegister 
-
+  // handleRegister
   describe("handleRegister", () => {
     function fillRegisterForm({
       username = "newuser",
@@ -181,17 +176,30 @@ describe("AuthModal", () => {
       expect(screen.getByText("✕ Password must be at least 6 characters.")).toBeInTheDocument();
     });
 
-    });
+    test("calls supabase.auth.signUp with correct credentials", async () => {
+      mockSignUp.mockResolvedValueOnce({ data: { user: { id: "new-1" } }, error: null });
+      mockInsertProfile.mockResolvedValueOnce({ error: null });
 
+      renderAuthModal();
+      fillRegisterForm();
+      fireEvent.click(screen.getByText("CREATE ACCOUNT"));
+
+      await waitFor(() => {
+        expect(mockSignUp).toHaveBeenCalledWith(
+          expect.objectContaining({
+            email: "new@example.com",
+            password: "secure123",
+          })
+        );
+      });
+    });
 
     test("shows success message after successful registration", async () => {
       mockSignUp.mockResolvedValueOnce({ data: { user: { id: "new-1" } }, error: null });
       mockInsertProfile.mockResolvedValueOnce({ error: null });
 
       renderAuthModal();
-      fillRegtest("calls supabase.auth.signUp with correct credentials", async () => {
-      mockSignUp.mockResolvedValueOnce({ data: { user: { id: "new-1" } }, error: null });
-      mocisterForm();
+      fillRegisterForm();
       fireEvent.click(screen.getByText("CREATE ACCOUNT"));
 
       await waitFor(() => {
@@ -203,14 +211,14 @@ describe("AuthModal", () => {
   //onClose
   describe("onClose", () => {
     test("calls onClose when [ CLOSE ] button is clicked", () => {
-      const onClose = jest.fn();
+      const onClose = vi.fn();
       renderAuthModal({ onClose });
       fireEvent.click(screen.getByText("[ CLOSE ]"));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     test("calls onClose when backdrop overlay is clicked", () => {
-      const onClose = jest.fn();
+      const onClose = vi.fn();
       const { container } = renderAuthModal({ onClose });
       fireEvent.click(container.firstChild);
       expect(onClose).toHaveBeenCalledTimes(1);

@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+// ─── AUTH MODAL ───────────────────────────────────────────────────────────────
+// Handles Login, Register, and displays appropriate error/success messages.
+// On successful login/register, calls onSuccess(user, isAdmin).
 export function AuthModal({ onClose, onSuccess }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
@@ -12,7 +15,9 @@ export function AuthModal({ onClose, onSuccess }) {
   const [loaded, setLoaded] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
 
-  useEffect(() => { setTimeout(() => setLoaded(true), 10); }, []);
+  useEffect(() => {
+    setTimeout(() => setLoaded(true), 10);
+  }, []);
 
   const resetForm = () => {
     setEmail(""); setPassword(""); setConfirmPassword("");
@@ -21,6 +26,7 @@ export function AuthModal({ onClose, onSuccess }) {
 
   const switchMode = (m) => { setMode(m); resetForm(); };
 
+  // ── REGISTER ──
   const handleRegister = async () => {
     setError(null);
     if (!username.trim()) return setError("Username is required.");
@@ -29,16 +35,22 @@ export function AuthModal({ onClose, onSuccess }) {
 
     setLoading(true);
     try {
+      // 1. Create auth user in Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { username } },
       });
+
       if (signUpError) throw signUpError;
 
+      // 2. Insert profile row with role = 'user'
+      // This assumes you have a `profiles` table with columns:
+      //   id (uuid, FK to auth.users), username (text), role (text)
       const { error: profileError } = await supabase
         .from("profiles")
         .insert([{ id: data.user.id, username, role: "user" }]);
+
       if (profileError) throw profileError;
 
       setSuccessMsg("Account created! You can now log in.");
@@ -50,18 +62,27 @@ export function AuthModal({ onClose, onSuccess }) {
     }
   };
 
+  // ── LOGIN ──
   const handleLogin = async () => {
     setError(null);
     setLoading(true);
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      // 1. Sign in with Supabase Auth
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
       if (signInError) throw signInError;
 
+      // 2. Fetch profile to get role
+      // Admin accounts are set by manually updating role to 'admin' in Supabase dashboard
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("username, role")
         .eq("id", data.user.id)
         .single();
+
       if (profileError) throw profileError;
 
       const isAdmin = profile.role === "admin";
@@ -131,7 +152,6 @@ export function AuthModal({ onClose, onSuccess }) {
           opacity: loaded ? 1 : 0,
           transform: loaded ? "translateY(0)" : "translateY(20px)",
           transition: "opacity 0.4s, transform 0.4s",
-          position: "relative",
         }}
       >
         {/* Header */}
@@ -139,7 +159,8 @@ export function AuthModal({ onClose, onSuccess }) {
           <div style={{
             fontFamily: "'DM Mono', monospace",
             fontSize: "9px", letterSpacing: "4px",
-            color: "#c0b8a8", textTransform: "uppercase", marginBottom: "10px",
+            color: "#c0b8a8", textTransform: "uppercase",
+            marginBottom: "10px",
           }}>
             REEL · {mode === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
           </div>
@@ -158,35 +179,54 @@ export function AuthModal({ onClose, onSuccess }) {
           {mode === "register" && (
             <div>
               <label style={labelStyle}>Username</label>
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                placeholder="your_username" style={inputStyle}
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="your_username"
+                style={inputStyle}
                 onFocus={(e) => (e.target.style.borderColor = "#9A5A30")}
                 onBlur={(e) => (e.target.style.borderColor = "#e0d9ce")}
               />
             </div>
           )}
+
           <div>
             <label style={labelStyle}>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com" style={inputStyle}
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              style={inputStyle}
               onFocus={(e) => (e.target.style.borderColor = "#9A5A30")}
               onBlur={(e) => (e.target.style.borderColor = "#e0d9ce")}
             />
           </div>
+
           <div>
             <label style={labelStyle}>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••" style={inputStyle}
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              style={inputStyle}
               onFocus={(e) => (e.target.style.borderColor = "#9A5A30")}
               onBlur={(e) => (e.target.style.borderColor = "#e0d9ce")}
               onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
             />
           </div>
+
           {mode === "register" && (
             <div>
               <label style={labelStyle}>Confirm Password</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••" style={inputStyle}
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                style={inputStyle}
                 onFocus={(e) => (e.target.style.borderColor = "#9A5A30")}
                 onBlur={(e) => (e.target.style.borderColor = "#e0d9ce")}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
@@ -195,12 +235,17 @@ export function AuthModal({ onClose, onSuccess }) {
           )}
         </div>
 
+        {/* Error / Success messages */}
         {error && (
           <div style={{
-            marginTop: "16px", padding: "10px 14px",
-            background: "#fff5f3", border: "1px solid #f0c4bc",
-            borderRadius: "3px", fontFamily: "'DM Mono', monospace",
-            fontSize: "10px", letterSpacing: "0.5px", color: "#B83A10",
+            marginTop: "16px",
+            padding: "10px 14px",
+            background: "#fff5f3",
+            border: "1px solid #f0c4bc",
+            borderRadius: "3px",
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "10px", letterSpacing: "0.5px",
+            color: "#B83A10",
           }}>
             ✕ {error}
           </div>
@@ -208,25 +253,36 @@ export function AuthModal({ onClose, onSuccess }) {
 
         {successMsg && (
           <div style={{
-            marginTop: "16px", padding: "10px 14px",
-            background: "#f3fff5", border: "1px solid #bcf0c4",
-            borderRadius: "3px", fontFamily: "'DM Mono', monospace",
-            fontSize: "10px", letterSpacing: "0.5px", color: "#3A8A3A",
+            marginTop: "16px",
+            padding: "10px 14px",
+            background: "#f3fff5",
+            border: "1px solid #bcf0c4",
+            borderRadius: "3px",
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "10px", letterSpacing: "0.5px",
+            color: "#3A8A3A",
           }}>
             ✓ {successMsg}
           </div>
         )}
 
+        {/* Submit button */}
         <button
-          onClick={handleSubmit} disabled={loading}
+          onClick={handleSubmit}
+          disabled={loading}
           style={{
-            marginTop: "24px", width: "100%",
+            marginTop: "24px",
+            width: "100%",
             background: loading ? "#c0b8a8" : "#1a1610",
-            border: "none", borderRadius: "3px", padding: "13px",
+            border: "none",
+            borderRadius: "3px",
+            padding: "13px",
             cursor: loading ? "not-allowed" : "pointer",
             fontFamily: "'DM Mono', monospace",
-            fontSize: "10px", letterSpacing: "3px", color: "#f5f0e8",
-            textTransform: "uppercase", transition: "background 0.2s",
+            fontSize: "10px", letterSpacing: "3px",
+            color: "#f5f0e8",
+            textTransform: "uppercase",
+            transition: "background 0.2s",
           }}
           onMouseEnter={(e) => { if (!loading) e.target.style.background = "#2e2820"; }}
           onMouseLeave={(e) => { if (!loading) e.target.style.background = "#1a1610"; }}
@@ -234,8 +290,10 @@ export function AuthModal({ onClose, onSuccess }) {
           {loading ? "PLEASE WAIT..." : mode === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
         </button>
 
+        {/* Mode switcher */}
         <div style={{
-          marginTop: "20px", textAlign: "center",
+          marginTop: "20px",
+          textAlign: "center",
           fontFamily: "'DM Mono', monospace",
           fontSize: "10px", letterSpacing: "1px", color: "#b0a898",
         }}>
@@ -246,13 +304,15 @@ export function AuthModal({ onClose, onSuccess }) {
               background: "none", border: "none", cursor: "pointer",
               fontFamily: "'DM Mono', monospace",
               fontSize: "10px", letterSpacing: "1px",
-              color: "#9A5A30", padding: 0, textDecoration: "underline",
+              color: "#9A5A30", padding: 0,
+              textDecoration: "underline",
             }}
           >
             {mode === "login" ? "Register here" : "Sign in instead"}
           </button>
         </div>
 
+        {/* Close */}
         <button
           onClick={onClose}
           style={{

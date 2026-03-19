@@ -1,9 +1,9 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MovieCard } from "../../my-react-app/src/components/MovieCard";
+import { MovieCard } from "../components/MovieCard";
 
 
-jest.mock("../hooks/useInView", () => ({
+vi.mock("../hooks/useInView", () => ({
   useInView: () => true,
 }));
 
@@ -40,7 +40,7 @@ function renderCard(props = {}) {
 //Test Suite
 describe("MovieCard", () => {
 
-//Rendering
+  //Rendering
   describe("rendering", () => {
     test("renders the movie title", () => {
       renderCard();
@@ -101,26 +101,24 @@ describe("MovieCard", () => {
     });
   });
 
-//On CLick
+  //On Click
   describe("onClick", () => {
     test("calls onClick with the movie object when card is clicked", () => {
-      const onClick = jest.fn();
+      const onClick = vi.fn();
       renderCard({ onClick });
       fireEvent.click(screen.getByText("Inception"));
       expect(onClick).toHaveBeenCalledWith(sampleMovie);
     });
 
     test("calls onClick exactly once per click", () => {
-      const onClick = jest.fn();
+      const onClick = vi.fn();
       renderCard({ onClick });
       fireEvent.click(screen.getByText("Inception"));
       expect(onClick).toHaveBeenCalledTimes(1);
     });
   });
 
-
   // Hover state
-
   describe("hover state", () => {
     test("applies hover styles on mouse enter", () => {
       const { container } = renderCard();
@@ -141,7 +139,6 @@ describe("MovieCard", () => {
   });
 
   // Visibility
-
   describe("visibility via useInView", () => {
     test("card is visible (opacity 1) when inView is true", () => {
       // useInView is mocked to return true at the top of this file
@@ -149,14 +146,11 @@ describe("MovieCard", () => {
       expect(container.firstChild.style.opacity).toBe("1");
     });
 
-    test("card is hidden (opacity 0) when inView is false", () => {
-      // Override the mock for this one test
-      jest.resetModules();
-      jest.doMock("../hooks/useInView", () => ({
+    test("card is hidden (opacity 0) when inView is false", async () => {
+      vi.doMock("../hooks/useInView", () => ({
         useInView: () => false,
       }));
-      // Re-import after mock reset
-      const { MovieCard: FreshMovieCard } = require("../MovieCard");
+      const { MovieCard: FreshMovieCard } = await import("../components/MovieCard");
       const { container } = render(
         <FreshMovieCard
           movie={sampleMovie}
