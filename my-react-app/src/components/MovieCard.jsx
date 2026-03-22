@@ -182,23 +182,22 @@ export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminD
             >
               EDIT
             </button>
-            {movie.fromSupabase && (
-              <button
-                onClick={() => onAdminDelete(movie)}
-                style={{
-                  flex: 1, background: "none",
-                  border: "1px solid #B83A10", borderRadius: "3px",
-                  padding: "6px 0", cursor: "pointer",
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "9px", letterSpacing: "1.5px", color: "#B83A10",
-                  transition: "background 0.2s, color 0.2s",
-                }}
-                onMouseEnter={(e) => { e.target.style.background = "#B83A10"; e.target.style.color = "#fff"; }}
-                onMouseLeave={(e) => { e.target.style.background = "none"; e.target.style.color = "#B83A10"; }}
-              >
-                DELETE
-              </button>
-            )}
+            {/* DELETE — shown on all cards for admins */}
+            <button
+              onClick={() => onAdminDelete(movie)}
+              style={{
+                flex: 1, background: "none",
+                border: "1px solid #B83A10", borderRadius: "3px",
+                padding: "6px 0", cursor: "pointer",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px", letterSpacing: "1.5px", color: "#B83A10",
+                transition: "background 0.2s, color 0.2s",
+              }}
+              onMouseEnter={(e) => { e.target.style.background = "#B83A10"; e.target.style.color = "#fff"; }}
+              onMouseLeave={(e) => { e.target.style.background = "none"; e.target.style.color = "#B83A10"; }}
+            >
+              DELETE
+            </button>
           </div>
         )}
       </div>

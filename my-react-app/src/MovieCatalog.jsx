@@ -10,7 +10,8 @@ import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
 export default function MovieCatalog() {
   // ── Movie state ──
   const [movies, setMovies] = useState([]);           // from TMDB
-  const [supabaseMovies, setSupabaseMovies] = useState([]); // admin-added from Supabase
+  const [supabaseMovies, setSupabaseMovies] = useState([]);
+  const [deletedTmdbIds, setDeletedTmdbIds] = useState(new Set());
   const [allGenres, setAllGenres] = useState(["ALL"]);
   const [activeGenre, setActiveGenre] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,30 +85,38 @@ export default function MovieCatalog() {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      const mapped = data.map((m, i) => ({
-        id: `sb-${m.id}`,
-        supabaseId: m.id,
-        tmdbId: m.tmdb_id || null,
-        title: m.title,
-        year: m.year || "N/A",
-        genre: Array.isArray(m.genre) ? m.genre : [],
-        rating: 0,
-        reviews: 0,
-        synopsis: m.synopsis || "No synopsis available.",
-        poster: m.poster_url || "https://via.placeholder.com/500x750?text=No+Poster",
-        accent: ACCENTS[i % ACCENTS.length],
-        index: formatIndex(i),
-        fromSupabase: true,
-      }));
-      // Always fully replace — never append
+      // Separate deleted markers from real admin-added movies
+      const deletedTmdbIds = new Set(
+        data.filter((m) => m.deleted).map((m) => m.tmdb_id).filter(Boolean)
+      );
+
+      const mapped = data
+        .filter((m) => !m.deleted) // exclude deleted markers from the grid
+        .map((m, i) => ({
+          id: `sb-${m.id}`,
+          supabaseId: m.id,
+          tmdbId: m.tmdb_id || null,
+          title: m.title,
+          year: m.year || "N/A",
+          genre: Array.isArray(m.genre) ? m.genre : [],
+          rating: 0,
+          reviews: 0,
+          synopsis: m.synopsis || "No synopsis available.",
+          poster: m.poster_url || "https://via.placeholder.com/500x750?text=No+Poster",
+          accent: ACCENTS[i % ACCENTS.length],
+          index: formatIndex(i),
+          fromSupabase: true,
+        }));
+
       setSupabaseMovies(mapped);
-    } else {
-      setSupabaseMovies([]);
+      return deletedTmdbIds;
     }
+    setSupabaseMovies([]);
+    return new Set();
   };
 
   useEffect(() => {
-    fetchSupabaseMovies();
+    fetchSupabaseMovies().then((deleted) => setDeletedTmdbIds(deleted));
   }, []);
 
   // ── Fetch movies from TMDB ──
@@ -166,25 +175,25 @@ export default function MovieCatalog() {
 
   const handleMovieDeleted = (deletedMovie) => {
     setSupabaseMovies((prev) => prev.filter((m) => m.supabaseId !== deletedMovie.supabaseId));
+    fetchSupabaseMovies().then((deleted) => setDeletedTmdbIds(deleted));
     setDeleteMovie(null);
   };
 
   const handleMovieSaved = () => {
     setShowAddMovie(false);
     setEditMovie(null);
-    setSupabaseMovies([]); // clear first to prevent duplicate flash
-    fetchSupabaseMovies();
+    setSupabaseMovies([]);
+    fetchSupabaseMovies().then((deleted) => setDeletedTmdbIds(deleted));
   };
 
-  // Merge Supabase admin movies (top) + TMDB movies (below)
-  // If a Supabase movie has a tmdb_id, hide the original TMDB card so it doesn't show twice
+  // Supabase movies at top, TMDB below — hide any TMDB movies that were overridden or deleted
   const overriddenTmdbIds = new Set(
     supabaseMovies.map((m) => m.tmdbId).filter(Boolean)
   );
 
   const allMovies = [
     ...supabaseMovies,
-    ...movies.filter((m) => !overriddenTmdbIds.has(m.id)),
+    ...movies.filter((m) => !overriddenTmdbIds.has(m.id) && !deletedTmdbIds.has(m.id)),
   ];
 
   const filtered = activeGenre === "ALL"
