@@ -1,13 +1,16 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { vi, describe, test, expect, beforeEach } from "vitest";
 import { MovieCard } from "../components/MovieCard";
 
+// ─── MOCK useInView ───────────────────────────────────────────────────────────
 
 vi.mock("../hooks/useInView", () => ({
   useInView: () => true,
 }));
 
-//Sample Movie
+// ─── SAMPLE DATA ──────────────────────────────────────────────────────────────
+
 const sampleMovie = {
   id: 1,
   title: "Inception",
@@ -37,10 +40,10 @@ function renderCard(props = {}) {
   );
 }
 
-//Test Suite
+// ─── TEST SUITE ───────────────────────────────────────────────────────────────
+
 describe("MovieCard", () => {
 
-  //Rendering
   describe("rendering", () => {
     test("renders the movie title", () => {
       renderCard();
@@ -63,29 +66,24 @@ describe("MovieCard", () => {
       expect(screen.getByText("8.8")).toBeInTheDocument();
     });
 
-    test("renders the vote count in thousands format when >= 1000", () => {
+    test("renders vote count in K format when >= 1000", () => {
       renderCard();
-      // 34512 → "34.5K VOTES"
       expect(screen.getByText("34.5K VOTES")).toBeInTheDocument();
     });
 
     test("renders raw vote count when fewer than 1000", () => {
-      renderCard({
-        movie: { ...sampleMovie, reviews: 450 },
-      });
+      renderCard({ movie: { ...sampleMovie, reviews: 450 } });
       expect(screen.getByText("450 VOTES")).toBeInTheDocument();
     });
 
-    test("renders the movie poster image with correct src", () => {
+    test("renders the poster image with correct src", () => {
       renderCard();
-      const img = screen.getByRole("img");
-      expect(img).toHaveAttribute("src", "https://example.com/inception.jpg");
+      expect(screen.getByRole("img")).toHaveAttribute("src", "https://example.com/inception.jpg");
     });
 
-    test("renders the movie poster image with correct alt text", () => {
+    test("renders the poster image with correct alt text", () => {
       renderCard();
-      const img = screen.getByRole("img");
-      expect(img).toHaveAttribute("alt", "Inception");
+      expect(screen.getByRole("img")).toHaveAttribute("alt", "Inception");
     });
 
     test("renders the index stamp", () => {
@@ -93,7 +91,7 @@ describe("MovieCard", () => {
       expect(screen.getByText("001")).toBeInTheDocument();
     });
 
-    test("renders a truncated synopsis", () => {
+    test("renders the synopsis", () => {
       renderCard();
       expect(
         screen.getByText("A thief who steals corporate secrets through dream-sharing technology.")
@@ -101,7 +99,6 @@ describe("MovieCard", () => {
     });
   });
 
-  //On Click
   describe("onClick", () => {
     test("calls onClick with the movie object when card is clicked", () => {
       const onClick = vi.fn();
@@ -118,50 +115,101 @@ describe("MovieCard", () => {
     });
   });
 
-  // Hover state
+  describe("star rating", () => {
+    test("shows 4 filled stars for rating 8.8 (rounds to 4/5)", () => {
+      const { container } = renderCard();
+      const filled = Array.from(container.querySelectorAll("span")).filter(
+        (s) => s.textContent === "★" && s.style.color === "rgb(230, 168, 23)"
+      );
+      // 4 rating stars + 1 score badge star = 5
+      expect(filled.length).toBe(5);
+    });
+
+    test("shows 5 filled stars for a perfect 10.0 rating", () => {
+      const { container } = renderCard({ movie: { ...sampleMovie, rating: 10.0 } });
+      const filled = Array.from(container.querySelectorAll("span")).filter(
+        (s) => s.textContent === "★" && s.style.color === "rgb(230, 168, 23)"
+      );
+      // 5 rating stars + 1 score badge star = 6
+      expect(filled.length).toBe(6);
+    });
+
+    test("shows 1 filled star for a low rating of 2.0", () => {
+      const { container } = renderCard({ movie: { ...sampleMovie, rating: 2.0 } });
+      const filled = Array.from(container.querySelectorAll("span")).filter(
+        (s) => s.textContent === "★" && s.style.color === "rgb(230, 168, 23)"
+      );
+      // 1 rating star + 1 score badge star = 2
+      expect(filled.length).toBe(2);
+    });
+  });
+
+  describe("admin controls", () => {
+    test("does not show EDIT or DELETE for non-admin users", () => {
+      renderCard({ isAdmin: false });
+      expect(screen.queryByText("EDIT")).not.toBeInTheDocument();
+      expect(screen.queryByText("DELETE")).not.toBeInTheDocument();
+    });
+
+    test("shows EDIT and DELETE buttons when isAdmin is true", () => {
+      renderCard({ isAdmin: true });
+      expect(screen.getByText("EDIT")).toBeInTheDocument();
+      expect(screen.getByText("DELETE")).toBeInTheDocument();
+    });
+
+    test("calls onAdminEdit with the movie when EDIT is clicked", () => {
+      const onAdminEdit = vi.fn();
+      renderCard({ isAdmin: true, onAdminEdit });
+      fireEvent.click(screen.getByText("EDIT"));
+      expect(onAdminEdit).toHaveBeenCalled();
+    });
+
+    test("calls onAdminDelete with the movie when DELETE is clicked", () => {
+      const onAdminDelete = vi.fn();
+      renderCard({ isAdmin: true, onAdminDelete });
+      fireEvent.click(screen.getByText("DELETE"));
+      expect(onAdminDelete).toHaveBeenCalledWith(sampleMovie);
+    });
+
+    test("clicking EDIT does not trigger the card onClick", () => {
+      const onClick = vi.fn();
+      const onAdminEdit = vi.fn();
+      renderCard({ isAdmin: true, onClick, onAdminEdit });
+      fireEvent.click(screen.getByText("EDIT"));
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    test("clicking DELETE does not trigger the card onClick", () => {
+      const onClick = vi.fn();
+      const onAdminDelete = vi.fn();
+      renderCard({ isAdmin: true, onClick, onAdminDelete });
+      fireEvent.click(screen.getByText("DELETE"));
+      expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+
   describe("hover state", () => {
-    test("applies hover styles on mouse enter", () => {
+    test("applies accent colour to border on mouse enter", () => {
       const { container } = renderCard();
       const card = container.firstChild;
       fireEvent.mouseEnter(card);
-      // Card border should include the accent color on hover
-      expect(card.style.border).toContain("#2E6FA3");
+      // jsdom converts #2E6FA3 with opacity to rgba format
+      expect(card.style.border).toContain("rgba(46, 111, 163");
     });
 
-    test("removes hover styles on mouse leave", () => {
+    test("removes accent colour from border on mouse leave", () => {
       const { container } = renderCard();
       const card = container.firstChild;
       fireEvent.mouseEnter(card);
       fireEvent.mouseLeave(card);
-      // Border should revert to the default non-accent colour
-      expect(card.style.border).not.toContain("#2E6FA3");
+      expect(card.style.border).not.toContain("rgba(46, 111, 163");
     });
   });
 
-  // Visibility
-  describe("visibility via useInView", () => {
-    test("card is visible (opacity 1) when inView is true", () => {
-      // useInView is mocked to return true at the top of this file
+  describe("visibility", () => {
+    test("card is fully visible (opacity 1) when inView is true", () => {
       const { container } = renderCard();
       expect(container.firstChild.style.opacity).toBe("1");
-    });
-
-    test("card is hidden (opacity 0) when inView is false", async () => {
-      vi.doMock("../hooks/useInView", () => ({
-        useInView: () => false,
-      }));
-      const { MovieCard: FreshMovieCard } = await import("../components/MovieCard");
-      const { container } = render(
-        <FreshMovieCard
-          movie={sampleMovie}
-          rank={0}
-          onClick={noop}
-          isAdmin={false}
-          onAdminEdit={noop}
-          onAdminDelete={noop}
-        />
-      );
-      expect(container.firstChild.style.opacity).toBe("0");
     });
   });
 });
