@@ -7,6 +7,11 @@ import { AuthModal } from "./components/AuthModal";
 import { AdminMovieModal } from "./components/AdminMovieModal";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
 
+// Reverse map: genre name → TMDB genre ID
+const GENRE_NAME_TO_ID = Object.fromEntries(
+  Object.entries(GENRE_MAP).map(([id, name]) => [name, Number(id)])
+);
+
 export default function MovieCatalog() {
   // ── Movie state ──
   const [movies, setMovies] = useState([]);           // from TMDB
@@ -125,9 +130,17 @@ export default function MovieCatalog() {
     setError(null);
 
     const isSearching = searchQuery.trim().length > 0;
-    const url = isSearching
-      ? `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(searchQuery)}&page=${page}`
-      : `${BASE_URL}/movie/popular?api_key=${API_KEY}&page=${page}`;
+    const isFiltered = activeGenre !== "ALL";
+
+    let url;
+    if (isSearching) {
+      url = `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(searchQuery)}&page=${page}`;
+    } else if (isFiltered) {
+      const genreId = GENRE_NAME_TO_ID[activeGenre];
+      url = `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=${genreId}&sort_by=popularity.desc&page=${page}`;
+    } else {
+      url = `${BASE_URL}/movie/popular?api_key=${API_KEY}&page=${page}`;
+    }
 
     fetch(url)
       .then((r) => {
@@ -164,7 +177,7 @@ export default function MovieCatalog() {
         setError(err.message);
         setLoading(false);
       });
-  }, [searchQuery, page]);
+  }, [searchQuery, page, activeGenre]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -396,7 +409,7 @@ export default function MovieCatalog() {
           {allGenres.map((g) => (
             <button
               key={g}
-              onClick={() => setActiveGenre(g)}
+              onClick={() => { setActiveGenre(g); setPage(1); }}
               style={{
                 background: "none",
                 border: activeGenre === g ? "1px solid #9A5A30" : "1px solid transparent",
