@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-
+// Admin delete movie logic (confirm + remove from Supabase)
 export function DeleteConfirmModal({ movie, onClose, onConfirm }) {
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-
+// Admin add/edit movie logic (validation + Supabase insert/update)
 export function AdminMovieModal({ editMovie, onClose, onSave }) {
   const [loaded, setLoaded] = useState(false);
   const [title, setTitle] = useState(editMovie?.title || "");
