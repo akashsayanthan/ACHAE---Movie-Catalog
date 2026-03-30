@@ -90,13 +90,12 @@ export default function MovieCatalog() {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      // Separate deleted markers from real admin-added movies
       const deletedTmdbIds = new Set(
         data.filter((m) => m.deleted).map((m) => m.tmdb_id).filter(Boolean)
       );
 
       const mapped = data
-        .filter((m) => !m.deleted) // exclude deleted markers from the grid
+        .filter((m) => !m.deleted)
         .map((m, i) => ({
           id: `sb-${m.id}`,
           supabaseId: m.id,
@@ -199,7 +198,6 @@ export default function MovieCatalog() {
     fetchSupabaseMovies().then((deleted) => setDeletedTmdbIds(deleted));
   };
 
-  // Supabase movies at top, TMDB below — hide any TMDB movies that were overridden or deleted
   const overriddenTmdbIds = new Set(
     supabaseMovies.map((m) => m.tmdbId).filter(Boolean)
   );
@@ -567,6 +565,7 @@ export default function MovieCatalog() {
         onClose={() => setSelected(null)}
         isAdmin={isAdmin}
         onAdminEdit={setEditMovie}
+        currentUser={currentUser}
       />
       {showAuthModal && (
         <AuthModal
