@@ -1,10 +1,13 @@
 import { useRef, useState } from "react";
 import { useInView } from "../hooks/useInView";
 
-export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminDelete }) {
+export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminDelete, currentUser, isFavourited, onToggleFavourite, isWatched, onToggleWatched, isWishlisted, onToggleWishlist }) {
   const ref = useRef();
   const inView = useInView(ref);
   const [hovered, setHovered] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
+  const [watchedLoading, setWatchedLoading] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
 
   return (
     <div
@@ -59,6 +62,98 @@ export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminD
           {movie.rating.toFixed(1)}
         </span>
       </div>
+
+      {/* Heart / Favourite button */}
+      {currentUser && (
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (favLoading) return;
+            setFavLoading(true);
+            await onToggleFavourite(movie);
+            setFavLoading(false);
+          }}
+          aria-label={isFavourited ? "Remove from favourites" : "Add to favourites"}
+          style={{
+            position: "absolute", top: "44px", right: "10px", zIndex: 3,
+            background: "rgba(255,255,255,0.88)",
+            backdropFilter: "blur(10px)",
+            border: `1px solid ${isFavourited ? "#e6a817" : "rgba(0,0,0,0.08)"}`,
+            borderRadius: "4px", padding: "4px 9px",
+            cursor: favLoading ? "wait" : "pointer",
+            fontSize: "13px", lineHeight: 1,
+            color: isFavourited ? "#e6a817" : "#ccc",
+            transition: "color 0.2s, border-color 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            if (!isFavourited) e.currentTarget.style.color = "#e6a817";
+          }}
+          onMouseLeave={(e) => {
+            if (!isFavourited) e.currentTarget.style.color = "#ccc";
+          }}
+        >
+          {isFavourited ? "♥" : "♡"}
+        </button>
+      )}
+
+      {/* Watched button */}
+      {currentUser && (
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (watchedLoading) return;
+            setWatchedLoading(true);
+            await onToggleWatched(movie);
+            setWatchedLoading(false);
+          }}
+          aria-label={isWatched ? "Remove from watched" : "Mark as watched"}
+          style={{
+            position: "absolute", top: "78px", right: "10px", zIndex: 3,
+            background: "rgba(255,255,255,0.88)",
+            backdropFilter: "blur(10px)",
+            border: `1px solid ${isWatched ? "#3A8A3A" : "rgba(0,0,0,0.08)"}`,
+            borderRadius: "4px", padding: "4px 9px",
+            cursor: watchedLoading ? "wait" : "pointer",
+            fontSize: "12px", lineHeight: 1,
+            color: isWatched ? "#3A8A3A" : "#ccc",
+            fontFamily: "'DM Mono', monospace", letterSpacing: "0.5px",
+            transition: "color 0.2s, border-color 0.2s",
+          }}
+          onMouseEnter={(e) => { if (!isWatched) e.currentTarget.style.color = "#3A8A3A"; }}
+          onMouseLeave={(e) => { if (!isWatched) e.currentTarget.style.color = "#ccc"; }}
+        >
+          ✓
+        </button>
+      )}
+
+      {/* Wishlist button */}
+      {currentUser && (
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (wishlistLoading) return;
+            setWishlistLoading(true);
+            await onToggleWishlist(movie);
+            setWishlistLoading(false);
+          }}
+          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          style={{
+            position: "absolute", top: "112px", right: "10px", zIndex: 3,
+            background: "rgba(255,255,255,0.88)",
+            backdropFilter: "blur(10px)",
+            border: `1px solid ${isWishlisted ? "#2E6FA3" : "rgba(0,0,0,0.08)"}`,
+            borderRadius: "4px", padding: "4px 7px",
+            cursor: wishlistLoading ? "wait" : "pointer",
+            fontSize: "13px", lineHeight: 1,
+            color: isWishlisted ? "#2E6FA3" : "#ccc",
+            transition: "color 0.2s, border-color 0.2s",
+          }}
+          onMouseEnter={(e) => { if (!isWishlisted) e.currentTarget.style.color = "#2E6FA3"; }}
+          onMouseLeave={(e) => { if (!isWishlisted) e.currentTarget.style.color = "#ccc"; }}
+        >
+          🎬
+        </button>
+      )}
 
       {/* Poster */}
       <div style={{ position: "relative", height: "256px", overflow: "hidden" }}>
@@ -138,7 +233,7 @@ export function MovieCard({ movie, rank, onClick, isAdmin, onAdminEdit, onAdminD
           borderTop: `1px solid ${hovered ? movie.accent + "22" : "#f0ece6"}`,
           transition: "border-color 0.3s",
         }}>
-          <div style={{ display: "flex", gap: "3px" }}>
+          <div data-testid="star-rating" style={{ display: "flex", gap: "3px" }}>
             {[1, 2, 3, 4, 5].map((i) => (
               <span key={i} style={{
                 fontSize: "11px",

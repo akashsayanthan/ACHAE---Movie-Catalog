@@ -136,8 +136,8 @@ export function ReviewsList({ movie, currentUser }) {
                     {new Date(review.created_at).toLocaleDateString("en-CA")}
                   </span>
 
-                  {/* Delete — only own reviews */}
-                  {currentUser?.id === review.user_id && (
+                  {/* Delete — own reviews or admin */}
+                  {(currentUser?.id === review.user_id || currentUser?.role === "admin") && (
                     <button
                       onClick={() => handleDelete(review.id)}
                       aria-label="Delete Review"

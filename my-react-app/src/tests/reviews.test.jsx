@@ -66,12 +66,12 @@ const sampleReviews = [
 
 const noop = () => {};
 
-// ─── REVIEW MODAL TESTS ───────────────────────────────────────────────────────
+// Review Modal
 
 describe("ReviewModal", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  // ── Rendering ──────────────────────────────────────────────────────────────
+  // Rendering
 
   describe("rendering", () => {
     test("renders the movie title in the heading", () => {
@@ -108,8 +108,7 @@ describe("ReviewModal", () => {
     });
   });
 
-  // ── Star rating ────────────────────────────────────────────────────────────
-
+  // Star rating
   describe("star rating", () => {
     test("all stars start unselected (aria-pressed false)", () => {
       render(<ReviewModal movie={sampleMovie} currentUser={loggedInUser} onClose={noop} onSave={noop} />);
@@ -136,7 +135,7 @@ describe("ReviewModal", () => {
     });
   });
 
-  // ── Validation ─────────────────────────────────────────────────────────────
+  // Validation
 
   describe("validation", () => {
     test("shows error when submitting with no star rating selected", () => {
@@ -174,7 +173,7 @@ describe("ReviewModal", () => {
     });
   });
 
-  // ── handleSubmit ───────────────────────────────────────────────────────────
+  // handleSubmit
 
   describe("handleSubmit", () => {
     function fillAndSubmit(text = "Mid Movie Don't watch it.") {
@@ -271,7 +270,7 @@ describe("ReviewModal", () => {
     });
   });
 
-  // ── onClose ────────────────────────────────────────────────────────────────
+  // onClose 
 
   describe("onClose", () => {
     test("calls onClose when CANCEL button is clicked", () => {
@@ -297,12 +296,12 @@ describe("ReviewModal", () => {
   });
 });
 
-// ─── REVIEWS LIST TESTS ───────────────────────────────────────────────────────
+// REVIEWS LIST TESTS 
 
 describe("ReviewsList", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  // ── Fetching ───────────────────────────────────────────────────────────────
+  //  Fetching 
 
   describe("fetching reviews", () => {
     test("shows loading state initially", () => {
@@ -362,7 +361,7 @@ describe("ReviewsList", () => {
     });
   });
 
-  // ── Write a Review button ──────────────────────────────────────────────────
+  // Write a Review button 
 
   describe("write a review button", () => {
     test("shows the button when a user is logged in", async () => {
@@ -395,7 +394,7 @@ describe("ReviewsList", () => {
     });
   });
 
-  // ── Deleting reviews ───────────────────────────────────────────────────────
+  // Deleting reviews
 
   describe("deleting reviews", () => {
     test("shows DELETE button only on the current user's own reviews", async () => {

@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
-import { API_KEY, BASE_URL, IMG_BASE, GENRE_MAP, ACCENTS, formatIndex } from "./lib/constants";
+import { API_KEY, BASE_URL, IMG_BASE, GENRE_MAP, ACCENTS, formatIndex, SORT_OPTIONS } from "./lib/constants";
 import { MovieCard } from "./components/MovieCard";
 import { Modal } from "./components/Modal";
 import { AuthModal } from "./components/AuthModal";
 import { AdminMovieModal } from "./components/AdminMovieModal";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
+import { FavouritesModal } from "./components/FavouritesModal";
+import { WatchedModal } from "./components/WatchedModal";
+import { WishlistModal } from "./components/WishlistModal";
 
 // Reverse map: genre name → TMDB genre ID
 const GENRE_NAME_TO_ID = Object.fromEntries(
@@ -19,6 +22,7 @@ export default function MovieCatalog() {
   const [deletedTmdbIds, setDeletedTmdbIds] = useState(new Set());
   const [allGenres, setAllGenres] = useState(["ALL"]);
   const [activeGenre, setActiveGenre] = useState("ALL");
+  const [activeSort, setActiveSort] = useState("popularity.desc");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [selected, setSelected] = useState(null);
@@ -37,6 +41,18 @@ export default function MovieCatalog() {
   const [showAddMovie, setShowAddMovie] = useState(false);
   const [editMovie, setEditMovie] = useState(null);
   const [deleteMovie, setDeleteMovie] = useState(null);
+
+  // ── Favourites state ──
+  const [favouriteIds, setFavouriteIds] = useState(new Set());
+  const [showFavourites, setShowFavourites] = useState(false);
+
+  // ── Watched state ──
+  const [watchedIds, setWatchedIds] = useState(new Set());
+  const [showWatched, setShowWatched] = useState(false);
+
+  // ── Wishlist state ──
+  const [wishlistIds, setWishlistIds] = useState(new Set());
+  const [showWishlist, setShowWishlist] = useState(false);
 
   // ── Restore session on mount ──
   useEffect(() => {
@@ -68,18 +84,39 @@ export default function MovieCatalog() {
       setCurrentUser({ ...user, username: profile.username, role: profile.role });
       setIsAdmin(profile.role === "admin");
     }
+
+    // Fetch favourite ids for this user
+    const { data: favs } = await supabase.from("favorites").select("movie_id").eq("user_id", user.id);
+    if (favs) setFavouriteIds(new Set(favs.map((f) => String(f.movie_id))));
+
+    // Fetch watched ids
+    const { data: watchedData } = await supabase.from("watched").select("movie_id").eq("user_id", user.id);
+    if (watchedData) setWatchedIds(new Set(watchedData.map((w) => String(w.movie_id))));
+
+    // Fetch wishlist ids
+    const { data: wishlistData } = await supabase.from("wishlist").select("movie_id").eq("user_id", user.id);
+    if (wishlistData) setWishlistIds(new Set(wishlistData.map((w) => String(w.movie_id))));
   };
 
-  const handleAuthSuccess = (user, adminStatus) => {
+  const handleAuthSuccess = async (user, adminStatus) => {
     setCurrentUser(user);
     setIsAdmin(adminStatus);
     setShowAuthModal(false);
+    const { data: favs } = await supabase.from("favorites").select("movie_id").eq("user_id", user.id);
+    if (favs) setFavouriteIds(new Set(favs.map((f) => String(f.movie_id))));
+    const { data: watchedData } = await supabase.from("watched").select("movie_id").eq("user_id", user.id);
+    if (watchedData) setWatchedIds(new Set(watchedData.map((w) => String(w.movie_id))));
+    const { data: wishlistData } = await supabase.from("wishlist").select("movie_id").eq("user_id", user.id);
+    if (wishlistData) setWishlistIds(new Set(wishlistData.map((w) => String(w.movie_id))));
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null);
     setIsAdmin(false);
+    setFavouriteIds(new Set());
+    setWatchedIds(new Set());
+    setWishlistIds(new Set());
   };
 
   // ── Fetch admin-added movies from Supabase ──
@@ -103,7 +140,7 @@ export default function MovieCatalog() {
           title: m.title,
           year: m.year || "N/A",
           genre: Array.isArray(m.genre) ? m.genre : [],
-          rating: 0,
+          rating: m.rating || 0,
           reviews: 0,
           synopsis: m.synopsis || "No synopsis available.",
           poster: m.poster_url || "https://via.placeholder.com/500x750?text=No+Poster",
@@ -130,15 +167,18 @@ export default function MovieCatalog() {
 
     const isSearching = searchQuery.trim().length > 0;
     const isFiltered = activeGenre !== "ALL";
+    const sortOption = SORT_OPTIONS.find((s) => s.value === activeSort);
+    // Title sort is client-side — use popularity for the server request
+    const serverSort = sortOption?.clientSide ? "popularity.desc" : activeSort;
 
     let url;
     if (isSearching) {
+      // Search doesn't support sort_by — results ranked by TMDB relevance
       url = `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(searchQuery)}&page=${page}`;
-    } else if (isFiltered) {
-      const genreId = GENRE_NAME_TO_ID[activeGenre];
-      url = `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=${genreId}&sort_by=popularity.desc&page=${page}`;
     } else {
-      url = `${BASE_URL}/movie/popular?api_key=${API_KEY}&page=${page}`;
+      // Use discover for ALL and genre-filtered views so sort_by works
+      const genreParam = isFiltered ? `&with_genres=${GENRE_NAME_TO_ID[activeGenre]}` : "";
+      url = `${BASE_URL}/discover/movie?api_key=${API_KEY}&sort_by=${serverSort}${genreParam}&vote_count.gte=50&page=${page}`;
     }
 
     fetch(url)
@@ -147,7 +187,7 @@ export default function MovieCatalog() {
         return r.json();
       })
       .then((data) => {
-        const mapped = data.results
+        let mapped = data.results
           .filter((m) => m.poster_path)
           .map((m, i) => ({
             id: m.id,
@@ -161,6 +201,13 @@ export default function MovieCatalog() {
             accent: ACCENTS[i % ACCENTS.length],
             index: formatIndex((page - 1) * 20 + i),
           }));
+
+        // Apply client-side title sort after fetch
+        if (activeSort === "title.asc") {
+          mapped = [...mapped].sort((a, b) => a.title.localeCompare(b.title));
+        } else if (activeSort === "title.desc") {
+          mapped = [...mapped].sort((a, b) => b.title.localeCompare(a.title));
+        }
 
         setMovies(mapped);
         setTotalPages(Math.min(data.total_pages, 10));
@@ -176,13 +223,18 @@ export default function MovieCatalog() {
         setError(err.message);
         setLoading(false);
       });
-  }, [searchQuery, page, activeGenre]);
+  }, [searchQuery, page, activeGenre, activeSort]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
     setActiveGenre("ALL");
     setSearchQuery(searchInput);
+  };
+
+  const handleSortChange = (sortValue) => {
+    setActiveSort(sortValue);
+    setPage(1);
   };
 
   const handleMovieDeleted = (deletedMovie) => {
@@ -198,18 +250,94 @@ export default function MovieCatalog() {
     fetchSupabaseMovies().then((deleted) => setDeletedTmdbIds(deleted));
   };
 
+  const handleToggleFavourite = async (movie) => {
+    if (!currentUser) return;
+    const movieId = String(movie.id);
+    const alreadyFavourited = favouriteIds.has(movieId);
+    if (alreadyFavourited) {
+      const { error } = await supabase.from("favorites").delete().eq("user_id", currentUser.id).eq("movie_id", movieId);
+      if (!error) setFavouriteIds((prev) => { const next = new Set(prev); next.delete(movieId); return next; });
+    } else {
+      const { error } = await supabase.from("favorites").insert([{
+        user_id: currentUser.id, movie_id: movieId, movie_title: movie.title,
+        movie_poster: movie.poster, movie_year: movie.year, movie_rating: movie.rating,
+        movie_genre: movie.genre, movie_synopsis: movie.synopsis,
+      }]);
+      if (!error) setFavouriteIds((prev) => new Set([...prev, movieId]));
+    }
+  };
+
+  const handleToggleWatched = async (movie) => {
+    if (!currentUser) return;
+    const movieId = String(movie.id);
+    const alreadyWatched = watchedIds.has(movieId);
+    if (alreadyWatched) {
+      const { error } = await supabase.from("watched").delete().eq("user_id", currentUser.id).eq("movie_id", movieId);
+      if (!error) setWatchedIds((prev) => { const next = new Set(prev); next.delete(movieId); return next; });
+    } else {
+      const { error } = await supabase.from("watched").insert([{
+        user_id: currentUser.id, movie_id: movieId, movie_title: movie.title,
+        movie_poster: movie.poster, movie_year: movie.year, movie_rating: movie.rating,
+        movie_genre: movie.genre, movie_synopsis: movie.synopsis,
+      }]);
+      if (!error) setWatchedIds((prev) => new Set([...prev, movieId]));
+    }
+  };
+
+  const handleToggleWishlist = async (movie) => {
+    if (!currentUser) return;
+    const movieId = String(movie.id);
+    const alreadyWishlisted = wishlistIds.has(movieId);
+    if (alreadyWishlisted) {
+      const { error } = await supabase.from("wishlist").delete().eq("user_id", currentUser.id).eq("movie_id", movieId);
+      if (!error) setWishlistIds((prev) => { const next = new Set(prev); next.delete(movieId); return next; });
+    } else {
+      const { error } = await supabase.from("wishlist").insert([{
+        user_id: currentUser.id, movie_id: movieId, movie_title: movie.title,
+        movie_poster: movie.poster, movie_year: movie.year, movie_rating: movie.rating,
+        movie_genre: movie.genre, movie_synopsis: movie.synopsis,
+      }]);
+      if (!error) setWishlistIds((prev) => new Set([...prev, movieId]));
+    }
+  };
+
   const overriddenTmdbIds = new Set(
     supabaseMovies.map((m) => m.tmdbId).filter(Boolean)
   );
 
-  const allMovies = [
+  // Merge both sources — Supabase movies are no longer pinned at top,
+  // they participate in the same sort as TMDB movies
+  const merged = [
     ...supabaseMovies,
     ...movies.filter((m) => !overriddenTmdbIds.has(m.id) && !deletedTmdbIds.has(m.id)),
   ];
 
+  // Apply sort to the full merged list
+  const sortedMerged = (() => {
+    const list = [...merged];
+    switch (activeSort) {
+      case "vote_average.desc":
+        return list.sort((a, b) => b.rating - a.rating);
+      case "vote_average.asc":
+        return list.sort((a, b) => a.rating - b.rating);
+      case "primary_release_date.desc":
+        return list.sort((a, b) => (b.year || "0").localeCompare(a.year || "0"));
+      case "primary_release_date.asc":
+        return list.sort((a, b) => (a.year || "0").localeCompare(b.year || "0"));
+      case "vote_count.desc":
+        return list.sort((a, b) => b.reviews - a.reviews);
+      case "title.asc":
+        return list.sort((a, b) => a.title.localeCompare(b.title));
+      case "title.desc":
+        return list.sort((a, b) => b.title.localeCompare(a.title));
+      default: // popularity.desc — keep existing order (TMDB already sorted)
+        return list;
+    }
+  })();
+
   const filtered = activeGenre === "ALL"
-    ? allMovies
-    : allMovies.filter((m) => m.genre.includes(activeGenre));
+    ? sortedMerged
+    : sortedMerged.filter((m) => m.genre.includes(activeGenre));
 
   if (!authChecked) return null;
 
@@ -311,6 +439,69 @@ export default function MovieCatalog() {
                       + ADD FILM
                     </button>
                   )}
+
+                  {/* My Favourites button */}
+                  <button
+                    onClick={() => setShowFavourites(true)}
+                    style={{
+                      background: "none", border: "1px solid #e0d9ce",
+                      borderRadius: "3px", padding: "8px 14px",
+                      cursor: "pointer", fontFamily: "'DM Mono', monospace",
+                      fontSize: "9px", letterSpacing: "2px", color: "#b0a898",
+                      transition: "border-color 0.2s, color 0.2s",
+                      display: "flex", alignItems: "center", gap: "6px",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#e6a817"; e.currentTarget.style.color = "#e6a817"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#e0d9ce"; e.currentTarget.style.color = "#b0a898"; }}
+                  >
+                    ♥{favouriteIds.size > 0 && (
+                      <span style={{ background: "#e6a817", color: "#fff", borderRadius: "10px", padding: "1px 6px", fontSize: "8px", fontWeight: "bold" }}>
+                        {favouriteIds.size}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Watched button */}
+                  <button
+                    onClick={() => setShowWatched(true)}
+                    style={{
+                      background: "none", border: "1px solid #e0d9ce",
+                      borderRadius: "3px", padding: "8px 14px",
+                      cursor: "pointer", fontFamily: "'DM Mono', monospace",
+                      fontSize: "9px", letterSpacing: "2px", color: "#b0a898",
+                      transition: "border-color 0.2s, color 0.2s",
+                      display: "flex", alignItems: "center", gap: "6px",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#3A8A3A"; e.currentTarget.style.color = "#3A8A3A"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#e0d9ce"; e.currentTarget.style.color = "#b0a898"; }}
+                  >
+                    ✓{watchedIds.size > 0 && (
+                      <span style={{ background: "#3A8A3A", color: "#fff", borderRadius: "10px", padding: "1px 6px", fontSize: "8px", fontWeight: "bold" }}>
+                        {watchedIds.size}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Wishlist button */}
+                  <button
+                    onClick={() => setShowWishlist(true)}
+                    style={{
+                      background: "none", border: "1px solid #e0d9ce",
+                      borderRadius: "3px", padding: "8px 14px",
+                      cursor: "pointer", fontFamily: "'DM Mono', monospace",
+                      fontSize: "9px", letterSpacing: "2px", color: "#b0a898",
+                      transition: "border-color 0.2s, color 0.2s",
+                      display: "flex", alignItems: "center", gap: "6px",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2E6FA3"; e.currentTarget.style.color = "#2E6FA3"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#e0d9ce"; e.currentTarget.style.color = "#b0a898"; }}
+                  >
+                    🎬{wishlistIds.size > 0 && (
+                      <span style={{ background: "#2E6FA3", color: "#fff", borderRadius: "10px", padding: "1px 6px", fontSize: "8px", fontWeight: "bold" }}>
+                        {wishlistIds.size}
+                      </span>
+                    )}
+                  </button>
 
                   <button
                     onClick={handleLogout}
@@ -424,6 +615,54 @@ export default function MovieCatalog() {
           ))}
         </div>
 
+        {/* ── SORT BAR ── */}
+        <div style={{
+          padding: "12px 56px", display: "flex",
+          borderBottom: "1px solid #e0d9ce", alignItems: "center",
+          background: "#ede8df", flexWrap: "wrap", gap: "4px",
+        }}>
+          <span style={{
+            fontFamily: "'DM Mono', monospace", fontSize: "9px",
+            letterSpacing: "3px", color: "#c0b8a8",
+            textTransform: "uppercase", marginRight: "16px",
+          }}>
+            SORT
+          </span>
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleSortChange(opt.value)}
+              style={{
+                background: activeSort === opt.value ? "#1a1610" : "none",
+                border: activeSort === opt.value ? "1px solid #1a1610" : "1px solid transparent",
+                borderRadius: "3px", cursor: "pointer",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px", letterSpacing: "1.5px",
+                textTransform: "uppercase",
+                color: activeSort === opt.value ? "#f5f0e8" : "#b0a898",
+                padding: "6px 12px", transition: "color 0.2s, border-color 0.2s, background 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (activeSort !== opt.value) e.target.style.color = "#1a1610";
+              }}
+              onMouseLeave={(e) => {
+                if (activeSort !== opt.value) e.target.style.color = "#b0a898";
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+          {searchQuery && (
+            <span style={{
+              fontFamily: "'DM Mono', monospace", fontSize: "9px",
+              color: "#c0b8a8", letterSpacing: "1px", marginLeft: "8px",
+              fontStyle: "italic",
+            }}>
+              (sort disabled during search)
+            </span>
+          )}
+        </div>
+
         {/* ── CONTENT ── */}
         {loading ? (
           <div style={{
@@ -488,6 +727,13 @@ export default function MovieCatalog() {
                 isAdmin={isAdmin}
                 onAdminEdit={setEditMovie}
                 onAdminDelete={setDeleteMovie}
+                currentUser={currentUser}
+                isFavourited={favouriteIds.has(String(movie.id))}
+                onToggleFavourite={handleToggleFavourite}
+                isWatched={watchedIds.has(String(movie.id))}
+                onToggleWatched={handleToggleWatched}
+                isWishlisted={wishlistIds.has(String(movie.id))}
+                onToggleWishlist={handleToggleWishlist}
               />
             ))}
           </div>
@@ -567,6 +813,30 @@ export default function MovieCatalog() {
         onAdminEdit={setEditMovie}
         currentUser={currentUser}
       />
+      {showFavourites && (
+        <FavouritesModal
+          currentUser={currentUser}
+          onClose={() => setShowFavourites(false)}
+          onSelectMovie={setSelected}
+          onRemove={(movieId) => setFavouriteIds((prev) => { const next = new Set(prev); next.delete(movieId); return next; })}
+        />
+      )}
+      {showWatched && (
+        <WatchedModal
+          currentUser={currentUser}
+          onClose={() => setShowWatched(false)}
+          onSelectMovie={setSelected}
+          onRemove={(movieId) => setWatchedIds((prev) => { const next = new Set(prev); next.delete(movieId); return next; })}
+        />
+      )}
+      {showWishlist && (
+        <WishlistModal
+          currentUser={currentUser}
+          onClose={() => setShowWishlist(false)}
+          onSelectMovie={setSelected}
+          onRemove={(movieId) => setWishlistIds((prev) => { const next = new Set(prev); next.delete(movieId); return next; })}
+        />
+      )}
       {showAuthModal && (
         <AuthModal
           onClose={() => setShowAuthModal(false)}

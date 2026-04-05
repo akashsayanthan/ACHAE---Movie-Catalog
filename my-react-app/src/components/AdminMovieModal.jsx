@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-// Admin add/edit movie logic (validation + Supabase insert/update)
+
 export function AdminMovieModal({ editMovie, onClose, onSave }) {
   const [loaded, setLoaded] = useState(false);
   const [title, setTitle] = useState(editMovie?.title || "");
@@ -8,6 +8,8 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
   const [genre, setGenre] = useState(editMovie?.genre?.join(", ") || "");
   const [synopsis, setSynopsis] = useState(editMovie?.synopsis || "");
   const [posterUrl, setPosterUrl] = useState(editMovie?.poster || "");
+  const [rating, setRating] = useState(editMovie?.rating || "");
+  const [ratingHovered, setRatingHovered] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -17,6 +19,8 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
     setError(null);
     if (!title.trim()) return setError("Title is required.");
     if (!year.trim() || isNaN(year)) return setError("Valid year is required.");
+    if (rating !== "" && (isNaN(rating) || Number(rating) < 0 || Number(rating) > 10))
+      return setError("Rating must be a number between 0 and 10.");
 
     setLoading(true);
     try {
@@ -26,7 +30,7 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
         genre: genre.split(",").map((g) => g.trim()).filter(Boolean),
         synopsis: synopsis.trim(),
         poster_url: posterUrl.trim(),
-        // Store the TMDB id so we can hide the TMDB card when this exists
+        rating: rating !== "" ? parseFloat(Number(rating).toFixed(1)) : 0,
         tmdb_id: editMovie?.tmdbId || null,
       };
 
@@ -120,6 +124,62 @@ export function AdminMovieModal({ editMovie, onClose, onSave }) {
             <label style={labelStyle}>Year *</label>
             <input type="text" value={year} onChange={(e) => setYear(e.target.value)}
               placeholder="e.g. 2024" style={inputStyle}
+              onFocus={(e) => (e.target.style.borderColor = "#9A5A30")}
+              onBlur={(e) => (e.target.style.borderColor = "#e0d9ce")}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Rating (0 – 10)</label>
+            {/* Star picker for quick selection */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+              <div style={{ display: "flex", gap: "4px" }}>
+                {[2, 4, 6, 8, 10].map((val) => {
+                  const filled = ratingHovered
+                    ? val <= ratingHovered
+                    : val <= Math.ceil(Number(rating));
+                  return (
+                    <span
+                      key={val}
+                      onClick={() => setRating(String(val))}
+                      onMouseEnter={() => setRatingHovered(val)}
+                      onMouseLeave={() => setRatingHovered(0)}
+                      style={{
+                        fontSize: "22px", cursor: "pointer",
+                        color: filled ? "#e6a817" : "#e0dbd4",
+                        transition: "color 0.15s", lineHeight: 1,
+                      }}
+                    >★</span>
+                  );
+                })}
+              </div>
+              <span style={{
+                fontFamily: "'DM Mono', monospace", fontSize: "10px",
+                color: "#b0a898", letterSpacing: "1px",
+              }}>
+                {rating !== "" ? `${Number(rating).toFixed(1)} / 10` : "Not set"}
+              </span>
+              {rating !== "" && (
+                <button
+                  onClick={() => setRating("")}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    fontFamily: "'DM Mono', monospace", fontSize: "9px",
+                    color: "#ccc", padding: 0, transition: "color 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.target.style.color = "#B83A10")}
+                  onMouseLeave={(e) => (e.target.style.color = "#ccc")}
+                >
+                  ✕ clear
+                </button>
+              )}
+            </div>
+            {/* Precise number input */}
+            <input
+              type="number" value={rating}
+              onChange={(e) => setRating(e.target.value)}
+              placeholder="e.g. 7.5"
+              min="0" max="10" step="0.1"
+              style={inputStyle}
               onFocus={(e) => (e.target.style.borderColor = "#9A5A30")}
               onBlur={(e) => (e.target.style.borderColor = "#e0d9ce")}
             />
