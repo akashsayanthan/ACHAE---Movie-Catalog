@@ -812,6 +812,7 @@ export default function MovieCatalog() {
         isAdmin={isAdmin}
         onAdminEdit={setEditMovie}
         currentUser={currentUser}
+        onSelectMovie={setSelected}
       />
       {showFavourites && (
         <FavouritesModal
