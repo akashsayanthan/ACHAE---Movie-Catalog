@@ -156,6 +156,7 @@ export default function MovieCatalog() {
     return new Set();
   };
 
+  // Fetch movies on load
   useEffect(() => {
     fetchSupabaseMovies().then((deleted) => setDeletedTmdbIds(deleted));
   }, []);
