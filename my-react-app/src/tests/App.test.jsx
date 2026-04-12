@@ -1,8 +1,11 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
+import App from "../App";
 
-// Mock Supabase so the session check in MovieCatalog doesn't cause
-// state-update-outside-act warnings when App renders.
+// MOCK SUPABASE 
+// Prevents state-update-outside-act warnings when App renders and
+
 vi.mock("./lib/supabaseClient", () => ({
   supabase: {
     auth: {
@@ -12,21 +15,22 @@ vi.mock("./lib/supabaseClient", () => ({
       }),
     },
     from: () => ({
-      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null }) }) }),
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({ data: null }),
+        }),
+      }),
     }),
   },
 }));
 
-// Mock TMDB fetch so no real network calls are made
+// MOCK TMDB FETCH
+
 beforeEach(() => {
   global.fetch = vi.fn(() =>
     Promise.resolve({
       ok: true,
-      json: () =>
-        Promise.resolve({
-          results: [],
-          total_pages: 1,
-        }),
+      json: () => Promise.resolve({ results: [], total_pages: 1 }),
     })
   );
 });
@@ -35,19 +39,20 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-import App from "../App";
+// TESTS 
+describe("App", () => {
+  test("UT-01-TB renders the REEL masthead", async () => {
+    render(<App />);
+    expect(await screen.findByText("REEL")).toBeInTheDocument();
+  });
 
-test("renders the REEL masthead", async () => {
-  render(<App />);
-  expect(await screen.findByText("REEL")).toBeInTheDocument();
-});
+  test("UT-02-TB renders the Sign In button when no user is logged in", async () => {
+    render(<App />);
+    expect(await screen.findByText("SIGN IN")).toBeInTheDocument();
+  });
 
-test("renders the Sign In button when no user is logged in", async () => {
-  render(<App />);
-  expect(await screen.findByText("SIGN IN")).toBeInTheDocument();
-});
-
-test("renders the film catalog subtitle", async () => {
-  render(<App />);
-  expect(await screen.findByText("A FILM CATALOG")).toBeInTheDocument();
+  test("UT-03-TB renders the film catalog subtitle", async () => {
+    render(<App />);
+    expect(await screen.findByText("A FILM CATALOG")).toBeInTheDocument();
+  });
 });
